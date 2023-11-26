@@ -25,10 +25,12 @@
 #include <nuttx/config.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <wchar.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <minmea/minmea.h>
 
@@ -39,8 +41,34 @@
 #define MINMEA_MAX_LENGTH    256
 
 /****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static bool g_gps_daemon_started;
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: sigterm_action
+ ****************************************************************************/
+
+static void sigterm_action(int signo, siginfo_t *siginfo, void *arg)
+{
+  if (signo == SIGTERM)
+    {
+      printf("SIGTERM received\n");
+      g_gps_daemon_started = false;
+      printf("gps_daemon: Terminated.\n");
+    }
+  else
+    {
+      printf("\nsigterm_action: Received signo=%d siginfo=%p arg=%p\n",
+             signo, siginfo, arg);
+    }
+}
+
 
 /****************************************************************************
  * gps_main
@@ -48,30 +76,71 @@
 
 int main(int argc, FAR char *argv[])
 {
-  int fd;
+  int fd, ret;
   int cnt;
   char ch;
   char line[MINMEA_MAX_LENGTH];
+  struct sigaction act;
+  pid_t mypid;
+
+  /* SIGTERM handler */
+
+  memset(&act, 0, sizeof(struct sigaction));
+  act.sa_sigaction = sigterm_action;
+  act.sa_flags     = SA_SIGINFO;
+
+  sigemptyset(&act.sa_mask);
+  sigaddset(&act.sa_mask, SIGTERM);
+
+  ret = sigaction(SIGTERM, &act, NULL);
+  if (ret != 0)
+    {
+      fprintf(stderr, "Failed to install SIGTERM handler, errno=%d\n",
+              errno);
+      return (EXIT_FAILURE + 1);
+    }
+
+  /* Parse command line */
+
+  if (argc < 2)
+    {
+      fprintf(stderr, "ERROR: Missing required arguments\n");
+      return EXIT_FAILURE;
+    }
+
+  if (strncmp(argv[1], "/dev/ttyS", 9) != 0)
+    {
+      fprintf(stderr, "ERROR: Invalid device name\n");
+      return EXIT_FAILURE;
+    }
 
   /* Open the GPS serial port */
 
-  fd = open("/dev/ttyS1", O_RDONLY);
+  fd = open(argv[1], O_RDONLY);
   if (fd < 0)
     {
-      printf("Unable to open file /dev/ttyS1\n");
+      printf("Unable to open file %s\n", argv[1]);
+      return EXIT_FAILURE;
     }
+
+  /* Indicate that we are running */
+
+  mypid = getpid();
+
+  g_gps_daemon_started = true;
+  printf("\gps_daemon (pid# %d): Running\n", mypid);
 
   /* Run forever */
 
-  for (; ; )
+  while (g_gps_daemon_started == true)
     {
       /* Read until we complete a line */
 
       cnt = 0;
       do
         {
-          read(fd, &ch, 1);
-          if (ch != '\r' && ch != '\n')
+          ret = read(fd, &ch, 1);
+          if (ret == 1 && ch != '\r' && ch != '\n')
             {
               line[cnt++] = ch;
             }
@@ -141,7 +210,15 @@ int main(int argc, FAR char *argv[])
             }
             break;
         }
+
+        usleep(1 * 1000L);
     }
+
+  /* treats signal termination of the task
+   * task terminated by a SIGTERM
+   */
+  exit(EXIT_SUCCESS);
+  close(fd);
 
   return 0;
 }
