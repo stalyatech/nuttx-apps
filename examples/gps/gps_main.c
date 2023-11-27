@@ -69,18 +69,15 @@ static void sigterm_action(int signo, siginfo_t *siginfo, void *arg)
     }
 }
 
-
 /****************************************************************************
- * gps_main
+ * Name: gps_daemon
  ****************************************************************************/
 
-int main(int argc, FAR char *argv[])
+static int gps_daemon(int argc, char *argv[])
 {
-  int fd, ret;
-  int cnt;
-  char ch;
-  char line[MINMEA_MAX_LENGTH];
+  char ch, line[MINMEA_MAX_LENGTH];
   struct sigaction act;
+  int fd, cnt, ret;
   pid_t mypid;
 
   /* SIGTERM handler */
@@ -100,35 +97,24 @@ int main(int argc, FAR char *argv[])
       return (EXIT_FAILURE + 1);
     }
 
-  /* Parse command line */
-
-  if (argc < 2)
-    {
-      fprintf(stderr, "ERROR: Missing required arguments\n");
-      return EXIT_FAILURE;
-    }
-
-  if (strncmp(argv[1], "/dev/ttyS", 9) != 0)
-    {
-      fprintf(stderr, "ERROR: Invalid device name\n");
-      return EXIT_FAILURE;
-    }
-
-  /* Open the GPS serial port */
-
-  fd = open(argv[1], O_RDONLY);
-  if (fd < 0)
-    {
-      printf("Unable to open file %s\n", argv[1]);
-      return EXIT_FAILURE;
-    }
-
   /* Indicate that we are running */
 
   mypid = getpid();
 
   g_gps_daemon_started = true;
-  printf("\gps_daemon (pid# %d): Running\n", mypid);
+  printf("\ngps_daemon (pid# %d): Running\n", mypid);
+
+  /* Open the GPS serial port */
+
+  printf("gps_daemon: Opening %s\n", argv[2]);
+  fd = open(argv[2], O_RDONLY);
+  if (fd < 0)
+    {
+      int errcode = errno;
+      printf("gps_daemon: ERROR: Failed to open %s: %d\n",
+             argv[2], errcode);
+      goto errout;
+    }
 
   /* Run forever */
 
@@ -158,11 +144,11 @@ int main(int argc, FAR char *argv[])
               if (minmea_parse_rmc(&frame, line))
                 {
                   printf("Fixed-point Latitude...........: %d\n",
-                         minmea_rescale(&frame.latitude, 1000));
+                         (int)minmea_rescale(&frame.latitude, 1000));
                   printf("Fixed-point Longitude..........: %d\n",
-                         minmea_rescale(&frame.longitude, 1000));
+                         (int)minmea_rescale(&frame.longitude, 1000));
                   printf("Fixed-point Speed..............: %d\n",
-                         minmea_rescale(&frame.speed, 1000));
+                         (int)minmea_rescale(&frame.speed, 1000));
                   printf("Floating point degree latitude.: %2.6f\n",
                          minmea_tocoord(&frame.latitude));
                   printf("Floating point degree longitude: %2.6f\n",
@@ -186,7 +172,7 @@ int main(int argc, FAR char *argv[])
                   printf("Fix quality....................: %d\n",
                          frame.fix_quality);
                   printf("Altitude.......................: %d\n",
-                         frame.altitude.value);
+                         (int)frame.altitude.value);
                   printf("Tracked satellites.............: %d\n",
                          frame.satellites_tracked);
                 }
@@ -211,14 +197,68 @@ int main(int argc, FAR char *argv[])
             break;
         }
 
-        usleep(1 * 1000L);
+        usleep(10 * 1000L);
     }
 
   /* treats signal termination of the task
    * task terminated by a SIGTERM
    */
-  exit(EXIT_SUCCESS);
-  close(fd);
 
-  return 0;
+  close(fd);
+  exit(EXIT_SUCCESS);
+
+errout:
+  g_gps_daemon_started = false;
+  printf("gps_daemon: Terminating\n");
+
+  return EXIT_FAILURE;
+}
+
+/****************************************************************************
+ * gps_main
+ ****************************************************************************/
+
+int main(int argc, FAR char *argv[])
+{
+  int ret;
+
+  /* Parse command line */
+
+  if (argc < 2)
+    {
+      fprintf(stderr, "ERROR: Missing required arguments\n");
+      return EXIT_FAILURE;
+    }
+
+  if (strncmp(argv[1], "/dev/ttyS", 9) != 0)
+    {
+      fprintf(stderr, "ERROR: Invalid device name\n");
+      return EXIT_FAILURE;
+    }
+  else if (strlen(argv[1]) <= 9)
+    {
+      fprintf(stderr, "ERROR: Invalid device name\n");
+      return EXIT_FAILURE;
+    }
+
+  printf("gps_main: Starting the gps_daemon\n");
+  if (g_gps_daemon_started)
+    {
+      printf("gps_main: gps_daemon already running\n");
+      return EXIT_SUCCESS;
+    }
+
+  ret = task_create("gps_daemon", CONFIG_EXAMPLES_GPS_PRIORITY,
+                    CONFIG_EXAMPLES_GPS_STACKSIZE, gps_daemon,
+                    argv);
+  if (ret < 0)
+    {
+      int errcode = errno;
+      printf("gps_main: ERROR: Failed to start gps_daemon: %d\n",
+             errcode);
+      return EXIT_FAILURE;
+    }
+
+  printf("gps_main: gps_daemon started\n");
+  return EXIT_SUCCESS;
 }

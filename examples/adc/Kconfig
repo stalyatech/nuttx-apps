@@ -42,4 +42,11 @@ config EXAMPLES_ADC_SWTRIG
 		issue the software trigger ioctl before attempting to read from the
 		ADC.
 
+config EXAMPLES_ADC_PRIORITY
+  int "ADC task priority"
+  default 100
+
+config EXAMPLES_ADC_STACKSIZE
+  int "ADC stack size"
+  default DEFAULT_TASK_STACKSIZE
 endif

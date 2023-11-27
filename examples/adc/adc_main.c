@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <debug.h>
+#include <signal.h>
 
 #include <nuttx/analog/adc.h>
 #include <nuttx/analog/ioctl.h>
@@ -57,6 +58,7 @@
  ****************************************************************************/
 
 static struct adc_state_s g_adcstate;
+static bool g_adc_daemon_started;
 
 /****************************************************************************
  * Public Data
@@ -65,6 +67,26 @@ static struct adc_state_s g_adcstate;
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: sigterm_action
+ ****************************************************************************/
+
+static void sigterm_action(int signo, siginfo_t *siginfo, void *arg)
+{
+  if (signo == SIGTERM)
+    {
+      printf("SIGTERM received\n");
+
+      g_adc_daemon_started = false;
+      printf("adc_daemon: Terminated.\n");
+    }
+  else
+    {
+      printf("\nsigterm_action: Received signo=%d siginfo=%p arg=%p\n",
+             signo, siginfo, arg);
+    }
+}
 
 /****************************************************************************
  * Name: adc_devpath
@@ -151,7 +173,7 @@ static void parse_args(FAR struct adc_state_s *adc, int argc,
   int index;
   int nargs;
 
-  for (index = 1; index < argc; )
+  for (index = 2; index < argc; )
     {
       ptr = argv[index];
       if (ptr[0] != '-')
@@ -193,22 +215,17 @@ static void parse_args(FAR struct adc_state_s *adc, int argc,
 }
 
 /****************************************************************************
- * Public Functions
+ * Name: adc_daemon
  ****************************************************************************/
 
-/****************************************************************************
- * Name: adc_main
- ****************************************************************************/
-
-int main(int argc, FAR char *argv[])
+static int adc_daemon(int argc, char *argv[])
 {
   struct adc_msg_s sample[CONFIG_EXAMPLES_ADC_GROUPSIZE];
+  struct sigaction act;
   size_t readsize;
   ssize_t nbytes;
-  int fd;
-  int errval = 0;
-  int ret;
-  int i;
+  int fd, ret, i;
+  pid_t mypid;
 
   UNUSED(ret);
 
@@ -248,15 +265,38 @@ int main(int argc, FAR char *argv[])
   if (fd < 0)
     {
       printf("adc_main: open %s failed: %d\n", g_adcstate.devpath, errno);
-      errval = 2;
       goto errout;
     }
+
+  /* SIGTERM handler */
+
+  memset(&act, 0, sizeof(struct sigaction));
+  act.sa_sigaction = sigterm_action;
+  act.sa_flags     = SA_SIGINFO;
+
+  sigemptyset(&act.sa_mask);
+  sigaddset(&act.sa_mask, SIGTERM);
+
+  ret = sigaction(SIGTERM, &act, NULL);
+  if (ret != 0)
+    {
+      fprintf(stderr, "Failed to install SIGTERM handler, errno=%d\n",
+              errno);
+      goto errout;
+    }
+
+  /* Indicate that we are running */
+
+  mypid = getpid();
+
+  g_adc_daemon_started = true;
+  printf("\nadc_daemon (pid# %d): Running\n", mypid);
 
   /* Now loop the appropriate number of times, displaying the collected
    * ADC samples.
    */
 
-  for (; ; )
+  while (g_adc_daemon_started == true)
     {
       /* Flush any output before the loop entered or from the previous pass
        * through the loop.
@@ -284,12 +324,10 @@ int main(int argc, FAR char *argv[])
 
       if (nbytes < 0)
         {
-          errval = errno;
-          if (errval != EINTR)
+          if (errno != EINTR)
             {
               printf("adc_main: read %s failed: %d\n",
-                     g_adcstate.devpath, errval);
-              errval = 3;
+                     g_adcstate.devpath, errno);
               goto errout_with_dev;
             }
 
@@ -326,10 +364,16 @@ int main(int argc, FAR char *argv[])
         {
           break;
         }
+
+      usleep(500 * 1000L);
     }
 
+  /* treats signal termination of the task
+   * task terminated by a SIGTERM
+   */
+
   close(fd);
-  return OK;
+  exit(EXIT_SUCCESS);
 
   /* Error exits */
 
@@ -337,7 +381,43 @@ errout_with_dev:
   close(fd);
 
 errout:
-  printf("Terminating!\n");
+  g_adc_daemon_started = false;
+  printf("adc_daemon: Terminating\n");
   fflush(stdout);
-  return errval;
+
+  return EXIT_FAILURE;
+}
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: adc_main
+ ****************************************************************************/
+
+int main(int argc, FAR char *argv[])
+{
+  int ret;
+
+  printf("adc_main: Starting the adc_daemon\n");
+  if (g_adc_daemon_started)
+    {
+      printf("adc_main: adc_daemon already running\n");
+      return EXIT_SUCCESS;
+    }
+
+  ret = task_create("adc_daemon", CONFIG_EXAMPLES_ADC_PRIORITY,
+                    CONFIG_EXAMPLES_ADC_STACKSIZE, adc_daemon,
+                    argv);
+  if (ret < 0)
+    {
+      int errcode = errno;
+      printf("adc_main: ERROR: Failed to start adc_daemon: %d\n",
+             errcode);
+      return EXIT_FAILURE;
+    }
+
+  printf("adc_main: adc_daemon started\n");
+  return EXIT_SUCCESS;
 }
