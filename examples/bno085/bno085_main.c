@@ -48,6 +48,7 @@ static bool g_sensor_daemon_started;
 
 static struct bno085_reports_s sensorReports[] = 
 {
+    #if 0
     // Accelerometer, 100 Hz
     {SH2_ACCELEROMETER, {.reportInterval_us = 10000}},
 
@@ -56,6 +57,7 @@ static struct bno085_reports_s sensorReports[] =
 
     // Magnetic field calibrated , 100 Hz
     {SH2_MAGNETIC_FIELD_CALIBRATED, {.reportInterval_us = 10000}},
+    #endif
 
     // Geo Magnetic field calibrated , 100 Hz
     {SH2_GEOMAGNETIC_ROTATION_VECTOR, {.reportInterval_us = 10000}},
@@ -237,7 +239,7 @@ static int sensor_daemon(int argc, char *argv[])
                   qua_data.j = sensor_data.un.arvrStabilizedGRV.j;
                   qua_data.k = sensor_data.un.arvrStabilizedGRV.k;
                   qua_data.real = sensor_data.un.arvrStabilizedGRV.real;
-                  q_to_ypr(qua_data.real, qua_data.i, qua_data.j, qua_data.k, &roll, &pitch, &yaw);
+                  q_to_ypr(qua_data.real, qua_data.i, qua_data.j, qua_data.k, &yaw, &pitch, &roll);
                   break;
               }
 

@@ -12,6 +12,12 @@ config EXAMPLES_BNO085
 
 if EXAMPLES_BNO085
 
+config EXAMPLES_BNO085_DEVPATH
+	string "BNO085 device path"
+	default "/dev/sensor0"
+	---help---
+		The default path to the BNO085 device. Default: /dev/sensor0
+
 config EXAMPLES_BNO085_PROGNAME
 	string "Program name"
 	default "bno085"
