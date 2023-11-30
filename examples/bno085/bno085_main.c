@@ -48,7 +48,6 @@ static bool g_sensor_daemon_started;
 
 static struct bno085_reports_s sensorReports[] = 
 {
-    #if 0
     // Accelerometer, 100 Hz
     {SH2_ACCELEROMETER, {.reportInterval_us = 10000}},
 
@@ -57,7 +56,6 @@ static struct bno085_reports_s sensorReports[] =
 
     // Magnetic field calibrated , 100 Hz
     {SH2_MAGNETIC_FIELD_CALIBRATED, {.reportInterval_us = 10000}},
-    #endif
 
     // Geo Magnetic field calibrated , 100 Hz
     {SH2_GEOMAGNETIC_ROTATION_VECTOR, {.reportInterval_us = 10000}},
@@ -89,6 +87,129 @@ static void sigterm_action(int signo, siginfo_t *siginfo, void *arg)
 }
 
 /****************************************************************************
+ * Name: open_sensor
+ ****************************************************************************/
+int open_sensor(void)
+{
+  int fd, ret, stat;
+
+  /* Open lowerhalf file to be able to read the data */
+
+  fd = open("/dev/sensor0", O_RDONLY | O_NONBLOCK);
+  if (fd < 0)
+    {
+      fprintf(stderr, "Failed to open smart sensor, errno=%d\n",
+              errno);
+      return -1;
+    }
+
+  /* Perform a reset */
+
+  ret = ioctl(fd, SNIOC_RESET, 0);
+  if (ret != 0) 
+    {
+      fprintf(stderr, "Failed to reset smart sensor, errno=%d\n",
+              errno);
+      close(fd);
+      return -1;
+    }
+
+  /* Wait till reset has been completed */
+  do 
+  {
+    ret = ioctl(fd, SNIOC_GETSTATUS, (unsigned long)&stat);
+    if (ret != 0) 
+      {
+        fprintf(stderr, "Failed to get status from smart sensor, errno=%d\n",
+                errno);
+        close(fd);
+        return -1;
+      }
+
+  } while (!(stat & BNO085_STATUS_READY));
+
+  /* Configure the sensor */
+
+  for (int n = 0; n < ARRAY_LEN(sensorReports); n++)
+  {
+    ret = ioctl(fd, SNIOC_SETCONFIG, &sensorReports[n]);
+    if (ret != 0) 
+      {
+        fprintf(stderr, "Failed to config smart sensor (%d), errno=%d\n",
+                sensorReports[n].sensorId, errno);
+        close(fd);
+        return -1;
+      }
+    usleep(100 * 1000L);
+  }
+
+  return fd;
+}
+
+/****************************************************************************
+ * Name: check_sensor
+ ****************************************************************************/
+
+int check_sensor(int fd)
+{
+  int ret, stat;
+
+  ret = ioctl(fd, SNIOC_GETSTATUS, (unsigned long)&stat);
+  if (ret != 0) 
+    {
+      fprintf(stderr, "Failed to get status from smart sensor, errno=%d\n",
+              errno);
+      return ret;
+    }
+
+  /* Check the fault status */
+
+  if (stat & BNO085_STATUS_FAULT)
+    {
+      printf("sensor_daemon: Faulty catched and recovered!\n");
+
+      /* Perform a reset */
+
+      ret = ioctl(fd, SNIOC_RESET, 0);
+      if (ret != 0) 
+        {
+          fprintf(stderr, "Failed to reset smart sensor, errno=%d\n",
+                  errno);
+          return ret;
+        }
+
+      /* Wait till reset has been completed */
+      do 
+      {
+        ret = ioctl(fd, SNIOC_GETSTATUS, (unsigned long)&stat);
+        if (ret != 0) 
+          {
+            fprintf(stderr, "Failed to get status from smart sensor, errno=%d\n",
+                    errno);
+            return ret;
+          }
+
+      } while (!(stat & BNO085_STATUS_READY));
+
+      /* Configure the sensor */
+
+      for (int n = 0; n < ARRAY_LEN(sensorReports); n++)
+      {
+        ret = ioctl(fd, SNIOC_SETCONFIG, &sensorReports[n]);
+        if (ret != 0) 
+          {
+            fprintf(stderr, "Failed to config smart sensor (%d), errno=%d\n",
+                    sensorReports[n].sensorId, errno);
+            return ret;
+          }
+        usleep(100 * 1000L);
+      }
+    }
+
+    return 0;
+}
+
+/****************************************************************************
  * Name: sensor_daemon
  ****************************************************************************/
 
@@ -100,9 +221,9 @@ static int sensor_daemon(int argc, char *argv[])
   sh2_Gyroscope_t      gyr_data;
   sh2_RotationVector_t qua_data; 
   float roll, pitch, yaw;
-  int fd, ret, ready;
   struct sigaction act;
   pid_t mypid;
+  int fd, ret;
 
   /* SIGTERM handler */
 
@@ -131,48 +252,15 @@ static int sensor_daemon(int argc, char *argv[])
    * the BNO085 are enabled.
    */
 
-  /* Open lowerhalf file to be able to read the data */
+  /* Open and configure the sensor */
 
-  fd = open("/dev/sensor0", O_RDONLY | O_NONBLOCK);
+  fd = open_sensor();
   if (fd < 0)
     {
-      printf("Failed to open smart sensor\n");
       goto errout;
     }
 
-  /* Perform a reset */
-
-  ret = ioctl(fd, SNIOC_RESET, 0);
-  if (ret != 0) 
-    {
-      printf("Failed to reset smart sensor\n");
-      goto errout_with_fd;
-    }
-
-  /* Wait till reset has been completed */
-  do 
-  {
-    ret = ioctl(fd, SNIOC_GETSTATUS, (unsigned long)&ready);
-    if (ret != 0) 
-      {
-        printf("Failed to get status from smart sensor\n");
-        goto errout_with_fd;
-      }
-
-  } while (!ready);
-
-  /* Configure the sensor */
-
-  for (int n = 0; n < ARRAY_LEN(sensorReports); n++)
-  {
-    ret = ioctl(fd, SNIOC_SETCONFIG, &sensorReports[n]);
-    if (ret != 0) 
-      {
-        printf("Failed to config smart sensor: %d\n", sensorReports[n].sensorId);
-        goto errout_with_fd;
-      }
-    usleep(100 * 1000L);
-  }
+  /* Poll event list */
 
   struct pollfd pfds =
   {
@@ -189,14 +277,34 @@ static int sensor_daemon(int argc, char *argv[])
 
   while (g_sensor_daemon_started == true)
     {
-      /* Poll the sensor */
 
-      ret = poll(&pfds, 1, -1);
-      if (ret < 0)
+      do 
         {
-          perror("Could not poll sensor.");
-          goto errout_with_fd;
-        }
+          /* Check the sensor health */
+        
+          ret = check_sensor(fd);
+          if (ret < 0)
+            {
+              if (g_sensor_daemon_started)
+                {
+                  goto errout_with_fd;
+                }
+            }
+
+          /* Poll the sensor */
+
+          ret = poll(&pfds, 1, 100);
+          if (ret < 0)
+            {
+              if (g_sensor_daemon_started)
+                {
+                  fprintf(stderr, "Failed to poll smart sensor, errno=%d\n",
+                                  errno);          
+                  goto errout_with_fd;
+                }
+            }
+          
+        } while (ret == 0);
 
       if (pfds.revents & POLLIN)
         {
@@ -205,8 +313,12 @@ static int sensor_daemon(int argc, char *argv[])
           ret = read(pfds.fd, &sensor_data, sizeof(sensor_data));
           if (ret != sizeof(sensor_data))
             {
-              perror("Could not read from sensor");
-              goto errout_with_fd;
+              if (g_sensor_daemon_started)
+                {
+                  fprintf(stderr, "Failed to read smart sensor, errno=%d\n",
+                                  errno);          
+                  goto errout_with_fd;
+                }
             }
 
             /* Check the sensor data */
@@ -245,12 +357,11 @@ static int sensor_daemon(int argc, char *argv[])
 
             /* Show us the data */
 
-            printf("Roll:%f Pitch:%f Yaw:%f\n", RAD2DEG(roll), RAD2DEG(pitch), RAD2DEG(yaw));
+            if (g_sensor_daemon_started)
+              {
+                printf("Roll:%f Pitch:%f Yaw:%f\n", RAD2DEG(roll), RAD2DEG(pitch), RAD2DEG(yaw));
+              }
         }
-
-      /* Just a little bit breath */
-
-      usleep(1 * 1000L);
     }
 
   /* treats signal termination of the task
