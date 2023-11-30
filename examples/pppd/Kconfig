@@ -12,6 +12,12 @@ config EXAMPLES_PPPD
 
 if EXAMPLES_PPPD
 
+config EXAMPLES_PPPD_DEVPATH
+	string "Modem device path"
+	default "/dev/ttyS3"
+	---help---
+		The default path to the modem device. Default: /dev/ttyS0
+
 config EXAMPLES_PPPD_STACKSIZE
 	int "pppd example stack stack size"
 	default DEFAULT_TASK_STACKSIZE

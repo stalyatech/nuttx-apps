@@ -43,6 +43,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <debug.h>
 
 #include "ppp_conf.h"
 #include "ppp_arch.h"

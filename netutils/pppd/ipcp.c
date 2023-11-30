@@ -42,6 +42,8 @@
  * Included Files
  ****************************************************************************/
 
+#include <debug.h>
+
 #include "ppp_conf.h"
 #include "ppp_arch.h"
 #include "ipcp.h"

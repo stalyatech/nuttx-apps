@@ -214,7 +214,7 @@ void ppp_reconnect(FAR struct ppp_context_s *ctx)
   sleep(1);
   write(ctx->ctl.fd, "+++", 3);
   sleep(2);
-  write(ctx->ctl.fd, "ATE1\r\n", 6);
+  write(ctx->ctl.fd, "ATE1&K0\r\n", 6);
 
   if (pppd_settings->disconnect_script)
     {
@@ -341,8 +341,8 @@ int pppd(const struct pppd_settings_s *pppd_settings)
       return 2;
     }
 
-  ctx->ctl.echo = true;
-  ctx->ctl.verbose = true;
+  ctx->ctl.echo = false;
+  ctx->ctl.verbose = false;
   ctx->ctl.timeout = 30;
 
   fds[0].fd = ctx->if_fd;

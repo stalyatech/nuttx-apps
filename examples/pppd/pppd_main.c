@@ -53,7 +53,7 @@
 static FAR const char connect_script[] =
   "ECHO ON "
   "TIMEOUT 30 "
-  "\"\" ATE1 "
+  "\"\" ATE1&K0 "
   "OK AT+CGDCONT=1,\\\"IP\\\",\\\"internet\\\" "
   "OK ATD*99***1# "
   "CONNECT \\c";
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
   {
     .disconnect_script = disconnect_script,
     .connect_script = connect_script,
-    .ttyname = "/dev/ttyS1",
+    .ttyname = CONFIG_EXAMPLES_PPPD_DEVPATH,
 #ifdef CONFIG_NETUTILS_PPPD_PAP
     .pap_username = "user",
     .pap_password = "pass",
