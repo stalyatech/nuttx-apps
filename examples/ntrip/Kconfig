@@ -1,0 +1,34 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_NTRIP
+	tristate "NTRIP example"
+	default n
+	depends on NET && NET_TCP
+	---help---
+		Enable the NTRIP test example
+
+if EXAMPLES_NTRIP
+
+config EXAMPLES_NTRIP_CLIENT_STACKSIZE
+	int "NTRIP Client stack size"
+	default 4096
+	---help---
+		This is the stack size allocated when the NTRIP client task runs
+
+config EXAMPLES_NTRIP_CLIENT_PRIORITY
+	int "NTRIP Client task priority"
+	default 100
+	---help---
+		This is the priority of the NTRIP client task
+
+config EXAMPLES_NTRIP_CLIENT_PROGNAME
+	string "NTRIP Client program name"
+	default "ntripc"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		NTRIP client program is installed.
+
+endif # EXAMPLES_NTRIP
