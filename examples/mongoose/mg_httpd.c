@@ -56,14 +56,11 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#include "netutils/netlib.h"
-
+#include <netutils/netlib.h>
 
 /* Include mongoose definitions */
 
-#include "hal.h"
 #include "net.h"
-
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -117,27 +114,32 @@ int main(int argc, FAR char *argv[])
 #ifdef CONFIG_NET_TCP
   printf("Starting mongoose\n");
 
-	/* Event manager */
+  /* Event manager */
+
   struct mg_mgr mgr;
 
-	/* Set log level */
+  /* Set log level */
+
   mg_log_set(MG_LL_NONE);
 
-	/* Initialise event manager */
+  /* Initialise event manager */
+
   mg_mgr_init(&mgr);
 
-	/* Initialise application */
- 	net_init(&mgr);
- 
-	/* Infinite event loop */
+  /* Initialise application */
+
+  net_init(&mgr);
+
+  /* Infinite event loop */
+
   while (1)
-	{
-		mg_mgr_poll(&mgr, 1000);
-	}
+    {
+      mg_mgr_poll(&mgr, 1000);
+    }
 
-	/* free the allocated resources */
+  /* free the allocated resources */
+
   mg_mgr_free(&mgr);
-
 #endif
 
 #ifndef CONFIG_NSH_NETINIT

@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Cesanta Software Limited
 // All rights reserved
 
-#include "hal.h"
 #include "net.h"
 
 #include <sys/ioctl.h>
@@ -310,9 +309,11 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
   if (ev == MG_EV_ACCEPT) {
     if (c->fn_data != NULL) {  // TLS listener!
       struct mg_tls_opts opts = {0};
-      opts.cert = mg_unpacked("/sdc/certs/server_cert.pem");
-      opts.key = mg_unpacked("/sdc/certs/server_key.pem");
+      opts.cert = mg_file_read(&mg_fs_posix, "/sdc/certs/server_cert.pem");
+      opts.key = mg_file_read(&mg_fs_posix,"/sdc/certs/server_key.pem");
       mg_tls_init(c, &opts);
+	  free(opts.cert.buf);
+	  free(opts.key.buf);
     }
   } else if (ev == MG_EV_HTTP_MSG) {
     struct mg_http_message *hm = (struct mg_http_message *) ev_data;

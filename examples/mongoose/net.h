@@ -4,7 +4,7 @@
 #ifndef __NET_H__
 #define __NET_H__
 
-#include "mongoose.h"
+#include <mongoose.h>
 
 #ifdef __cplusplus
 extern "C" {

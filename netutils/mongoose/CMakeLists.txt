@@ -40,8 +40,9 @@ if(CONFIG_NETUTILS_MONGOOSE)
   endif()
 
   target_include_directories(apps PUBLIC mongoose)
-  target_compile_options(apps PRIVATE -DMG_ARCH=MG_ARCH_UNIX -DMG_ENABLE_SSI=1 -DMG_IO_SIZE=512 -DMG_TLS=MG_TLS_NONE)
+  target_compile_options(apps PRIVATE -DMG_ARCH=MG_ARCH_UNIX -DMG_ENABLE_SSI=1 -DMG_IO_SIZE=512 -DMG_TLS=MG_TLS_BUILTIN)
   target_sources(
     apps
     PRIVATE mongoose/mongoose.c)
 endif()
+ 
