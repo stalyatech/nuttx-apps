@@ -1,0 +1,20 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config NETUTILS_MONGOOSE
+	bool "Mongoose library"
+	default n
+	---help---
+		Mongoose is a network library for C/C++. It provides event-driven 
+		non-blocking APIs for TCP, UDP, HTTP, WebSocket, MQTT, and other 
+		protocols.
+
+if NETUTILS_MONGOOSE
+
+config MONGOOSE_VERSION
+	string "Mongoose Version"
+	default "7.14"
+
+endif # NETUTILS_MONGOOSE

@@ -1,0 +1,52 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_MONGOOSE
+	tristate "Mongoose examples"
+	default n
+	depends on NETUTILS_MONGOOSE
+	---help---
+		Enable the Mongoose examples.
+
+if EXAMPLES_MONGOOSE
+
+config EXAMPLES_MONGOOSE_HTTPD
+	tristate "Mongoose web server"
+	default n
+	depends on NETUTILS_MONGOOSE
+	---help---
+		Enable the Mongoose web server example.
+
+if EXAMPLES_MONGOOSE_HTTPD
+
+config EXAMPLES_MG_HTTPD_PRIORITY
+	int "Mongoose web server task priority"
+	default 100
+
+config EXAMPLES_MG_HTTPD_STACKSIZE
+	int "Mongoose web server stack size"
+	default 6144
+
+endif
+
+config EXAMPLES_MONGOOSE_IPADDR
+	hex "Device IP"
+	default 0x0a000014
+	---help---
+		This is the IP address of your board.
+
+config EXAMPLES_MONGOOSE_DRIPADDR
+	hex "Default Router IP"
+	default 0x0a000001
+	---help---
+		This is the IP address of your router/gateway.
+
+config EXAMPLES_MONGOOSE_NETMASK
+	hex "Network Mask"
+	default 0xffffff00
+	---help---
+		This is the network mask to use on this device.
+
+endif
