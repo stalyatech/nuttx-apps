@@ -93,10 +93,7 @@ int main(int argc, FAR char *argv[])
   uint32_t udpserver_ipv4;
   socklen_t addrlen;
   int sockfd, fd;
-  int nbytes;
-  int offset;
-
-  int cnt;
+  int nbytes, cnt;
   char ch;
   char line[MINMEA_MAX_LENGTH];
 
@@ -222,12 +219,11 @@ int main(int argc, FAR char *argv[])
 
         if (nbytes < 0)
           {
-            printf("client: %d. sendto failed: %d\n", offset, errno);
+            printf("client: sendto failed: %d\n", errno);
           }
         else if (nbytes != cnt)
           {
-            printf("client: %d. Bad send length: %d Expected: %d\n",
-                    offset, nbytes, cnt);
+            printf("client: Bad send length: %d Expected: %d\n", nbytes, cnt);
           }
 
     }

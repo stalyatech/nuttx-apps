@@ -286,18 +286,18 @@ static void handle_leds_toogle(struct mg_connection *c,
                                struct mg_http_message *hm) {
 
   static bool val = 0;
-  int ret;
+  int ret = -1;
 
 	/* open the file */
   int fd = open("/dev/led1", O_WRONLY);
   if (fd > 0) {
 
-	/* acces to the LED*/
-	val ^= 1;
-	ret = ioctl(fd, GPIOC_WRITE, (unsigned long)val);
+    /* acces to the LED*/
+    val ^= 1;
+    ret = ioctl(fd, GPIOC_WRITE, (unsigned long)val);
 
-	/* close the file */
-	close(fd);
+    /* close the file */
+    close(fd);
   }
 
   mg_http_reply(c, 200, s_json_header, (ret < 0) ? "false\n" : "true\n");
