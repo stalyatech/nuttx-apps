@@ -27,4 +27,24 @@ config EXAMPLES_GPS_STACKSIZE
 	int "GPS stack size"
 	default DEFAULT_TASK_STACKSIZE
 
+config EXAMPLES_GPS_DEVPATH
+	string "GPS device path"
+	default "/dev/ttyS5"
+	---help---
+		The device path to the GPS device
+
+config EXAMPLES_GPS_SERVER_IPADDR
+	hex "Server IP address"
+	default 0x0a000014
+	---help---
+		This is the IP address of UDP server.
+
+config EXAMPLES_GPS_SERVER_PORTNO
+	int "Server port number"
+	default 5471
+
+config EXAMPLES_GPS_CLIENT_PORTNO
+	int "Client port number"
+	default 5472
+
 endif

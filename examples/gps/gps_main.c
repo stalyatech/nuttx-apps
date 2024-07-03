@@ -24,11 +24,17 @@
 
 #include <nuttx/config.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <wchar.h>
 #include <syslog.h>
 #include <unistd.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <minmea/minmea.h>
 
@@ -37,6 +43,41 @@
  ****************************************************************************/
 
 #define MINMEA_MAX_LENGTH    256
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static int create_socket(void)
+{
+  struct sockaddr_in addr;
+  socklen_t addrlen;
+  int sockfd;
+
+  /* Create a new IPv4 UDP socket */
+
+  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sockfd < 0)
+    {
+      printf("client ERROR: client socket failure %d\n", errno);
+      return -1;
+    }
+
+  /* Bind the UDP socket to a IPv4 port */
+
+  addr.sin_family      = AF_INET;
+  addr.sin_port        = HTONS(CONFIG_EXAMPLES_GPS_CLIENT_PORTNO);
+  addr.sin_addr.s_addr = HTONL(INADDR_ANY);
+  addrlen              = sizeof(struct sockaddr_in);
+
+  if (bind(sockfd, (FAR struct sockaddr *)&addr, addrlen) < 0)
+    {
+      printf("client ERROR: Bind failure: %d\n", errno);
+      return -1;
+    }
+
+  return sockfd;
+}
 
 /****************************************************************************
  * Public Functions
@@ -48,18 +89,50 @@
 
 int main(int argc, FAR char *argv[])
 {
-  int fd;
+  struct sockaddr_in server;
+  uint32_t udpserver_ipv4;
+  socklen_t addrlen;
+  int sockfd, fd;
+  int nbytes;
+  int offset;
+
   int cnt;
   char ch;
   char line[MINMEA_MAX_LENGTH];
 
-  /* Open the GPS serial port */
+  /* Create a new UDP socket */
 
+  sockfd = create_socket();
+  if (sockfd < 0)
+    {
+      printf("Failed to create socket connection!\n");
+      exit(1);
+    }
+
+  /* Open the GPS serial port */
+#ifdef CONFIG_EXAMPLES_GPS_DEVPATH
+  fd = open(CONFIG_EXAMPLES_GPS_DEVPATH, O_RDONLY);
+#else
   fd = open("/dev/ttyS1", O_RDONLY);
+#endif
   if (fd < 0)
     {
-      printf("Unable to open file /dev/ttyS1\n");
+      printf("Failed to open device path!\n");
+      close(sockfd);
+      exit(2);
     }
+
+  /* Set up the server address */
+
+  server.sin_family      = AF_INET;
+  server.sin_port        = HTONS(CONFIG_EXAMPLES_GPS_SERVER_PORTNO);
+#ifdef CONFIG_EXAMPLES_GPS_SERVER_IPADDR
+  udpserver_ipv4         = HTONL(CONFIG_EXAMPLES_GPS_SERVER_IPADDR);
+#else
+  udpserver_ipv4         = HTONL(0x0a000014);
+#endif
+  server.sin_addr.s_addr = (in_addr_t)udpserver_ipv4;
+  addrlen                = sizeof(struct sockaddr_in);
 
   /* Run forever */
 
@@ -88,11 +161,11 @@ int main(int argc, FAR char *argv[])
 
               if (minmea_parse_rmc(&frame, line))
                 {
-                  printf("Fixed-point Latitude...........: %d\n",
+                  printf("Fixed-point Latitude...........: %ld\n",
                          minmea_rescale(&frame.latitude, 1000));
-                  printf("Fixed-point Longitude..........: %d\n",
+                  printf("Fixed-point Longitude..........: %ld\n",
                          minmea_rescale(&frame.longitude, 1000));
-                  printf("Fixed-point Speed..............: %d\n",
+                  printf("Fixed-point Speed..............: %ld\n",
                          minmea_rescale(&frame.speed, 1000));
                   printf("Floating point degree latitude.: %2.6f\n",
                          minmea_tocoord(&frame.latitude));
@@ -116,7 +189,7 @@ int main(int argc, FAR char *argv[])
                 {
                   printf("Fix quality....................: %d\n",
                          frame.fix_quality);
-                  printf("Altitude.......................: %d\n",
+                  printf("Altitude.......................: %ld\n",
                          frame.altitude.value);
                   printf("Tracked satellites.............: %d\n",
                          frame.satellites_tracked);
@@ -141,6 +214,22 @@ int main(int argc, FAR char *argv[])
             }
             break;
         }
+
+        /* Send the message */
+
+        nbytes = sendto(sockfd, line, cnt, 0,
+                        (struct sockaddr *)&server, addrlen);
+
+        if (nbytes < 0)
+          {
+            printf("client: %d. sendto failed: %d\n", offset, errno);
+          }
+        else if (nbytes != cnt)
+          {
+            printf("client: %d. Bad send length: %d Expected: %d\n",
+                    offset, nbytes, cnt);
+          }
+
     }
 
   return 0;

@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/mongoose/Makefile
+# apps/ardusimple/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,27 +18,6 @@
 #
 ############################################################################
 
-include $(APPDIR)/Make.defs
+MENUDESC = "Ardusimple"
 
-# Compiler directives
-
-CFLAGS += -DMG_ARCH=MG_ARCH_UNIX
-
-# Source files
-
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_HTTPD),)
-CSRCS    += httpd/net.c
-MAINSRC  += httpd/httpd.c
-PROGNAME += mg_httpd
-endif
-
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_WEBSOCKD),)
-MAINSRC  += websockd/websockd.c
-PROGNAME += mg_websockd
-endif
-
-PRIORITY  = $(CONFIG_EXAMPLES_MONGOOSE_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_MONGOOSE_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_MONGOOSE)
-
-include $(APPDIR)/Application.mk
+include $(APPDIR)/Directory.mk

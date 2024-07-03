@@ -13,23 +13,30 @@ config EXAMPLES_MONGOOSE
 if EXAMPLES_MONGOOSE
 
 config EXAMPLES_MONGOOSE_HTTPD
-	tristate "Mongoose web server"
+	tristate "Mongoose Web server"
 	default n
 	depends on NETUTILS_MONGOOSE
 	---help---
 		Enable the Mongoose web server example.
 
-if EXAMPLES_MONGOOSE_HTTPD
+config EXAMPLES_MONGOOSE_WEBSOCKD
+	tristate "Mongoose Websocket server"
+	default n
+	depends on NETUTILS_MONGOOSE
+	---help---
+		Enable the Mongoose websocket server example.
 
-config EXAMPLES_MG_HTTPD_PRIORITY
-	int "Mongoose web server task priority"
+config EXAMPLES_MONGOOSE_PRIORITY
+	int "Mongoose task priority"
 	default 100
 
-config EXAMPLES_MG_HTTPD_STACKSIZE
-	int "Mongoose web server stack size"
+config EXAMPLES_MONGOOSE_STACKSIZE
+	int "Mongoose stack size"
 	default 6144
 
-endif
+config EXAMPLES_MONGOOSE_SERVPORTNO
+	int "Mongoose service port number"
+	default 5471
 
 config EXAMPLES_MONGOOSE_IPADDR
 	hex "Device IP"

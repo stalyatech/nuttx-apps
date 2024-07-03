@@ -1,5 +1,5 @@
 # ##############################################################################
-# apps/examples/mongoose/CMakeLists.txt
+# apps/ardusimple/CMakeLists.txt
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
@@ -18,25 +18,4 @@
 #
 # ##############################################################################
 
-if (CONFIG_EXAMPLES_MONGOOSE)
-
-	# Web server
-  if (CONFIG_EXAMPLES_MONGOOSE_HTTPD)
-		nuttx_add_application(
-			NAME
-			mg_httpd
-			SRCS
-			httpd/net.c 
-			httpd/httpd.c)
-	endif
-
-	# Websocket server
-	if (CONFIG_EXAMPLES_MONGOOSE_WEBSOCKD)
-		nuttx_add_application(
-			NAME
-			mg_websockd
-			SRCS
-			websockd/websockd.c)
-	endif
-
-endif()
+nuttx_generate_kconfig(MENUDESC "Ardusimple")

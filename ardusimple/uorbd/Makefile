@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/mongoose/Makefile
+# apps/ardusimple/uorbd/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,25 +20,15 @@
 
 include $(APPDIR)/Make.defs
 
-# Compiler directives
+# uORB service info
 
-CFLAGS += -DMG_ARCH=MG_ARCH_UNIX
+PROGNAME = $(CONFIG_ARDUSIMPLE_UORBD_PROGNAME)
+PRIORITY = $(CONFIG_ARDUSIMPLE_UORBD_PRIORITY)
+STACKSIZE = $(CONFIG_ARDUSIMPLE_UORBD_STACKSIZE)
+MODULE = $(CONFIG_ARDUSIMPLE_UORBD)
 
-# Source files
+# uORB service application
 
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_HTTPD),)
-CSRCS    += httpd/net.c
-MAINSRC  += httpd/httpd.c
-PROGNAME += mg_httpd
-endif
-
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_WEBSOCKD),)
-MAINSRC  += websockd/websockd.c
-PROGNAME += mg_websockd
-endif
-
-PRIORITY  = $(CONFIG_EXAMPLES_MONGOOSE_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_MONGOOSE_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_MONGOOSE)
+MAINSRC = uorbd.c
 
 include $(APPDIR)/Application.mk
