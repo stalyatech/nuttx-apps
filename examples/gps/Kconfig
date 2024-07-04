@@ -33,6 +33,12 @@ config EXAMPLES_GPS_DEVPATH
 	---help---
 		The device path to the GPS device
 
+config EXAMPLES_GPS_BAUDRATE
+	int "GPS port Baudrate"
+	default 38400
+	---help---
+		Choose GPS serial port baudrate.
+
 config EXAMPLES_GPS_SERVER_IPADDR
 	hex "Server IP address"
 	default 0x0a000014
