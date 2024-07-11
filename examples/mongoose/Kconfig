@@ -26,17 +26,20 @@ config EXAMPLES_MONGOOSE_WEBSOCKD
 	---help---
 		Enable the Mongoose websocket server example.
 
+config EXAMPLES_MONGOOSE_SMARTANT
+	tristate "Mongoose Smart Antenna server"
+	default n
+	depends on NETUTILS_MONGOOSE && UORB
+	---help---
+		Enable the Mongoose smart antenna server example.
+
 config EXAMPLES_MONGOOSE_PRIORITY
 	int "Mongoose task priority"
 	default 100
 
 config EXAMPLES_MONGOOSE_STACKSIZE
 	int "Mongoose stack size"
-	default 6144
-
-config EXAMPLES_MONGOOSE_SERVPORTNO
-	int "Mongoose service port number"
-	default 5471
+	default 8192
 
 config EXAMPLES_MONGOOSE_IPADDR
 	hex "Device IP"

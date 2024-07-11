@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/mongoose/Makefile
+# apps/ardusimple/mpoll/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,30 +20,15 @@
 
 include $(APPDIR)/Make.defs
 
-# Compiler directives
+# Application info
 
-CFLAGS += -DMG_ARCH=MG_ARCH_UNIX -DMG_ENABLE_SSI=1 -DMG_IO_SIZE=2048 -DMG_TLS=MG_TLS_BUILTIN -DMG_PATH_MAX=256 -DMG_SSI_BUFSIZ=256
+PROGNAME = $(CONFIG_ARDUSIMPLE_MPOLL_PROGNAME)
+PRIORITY = $(CONFIG_ARDUSIMPLE_MPOLL_PRIORITY)
+STACKSIZE = $(CONFIG_ARDUSIMPLE_MPOLL_STACKSIZE)
+MODULE = $(CONFIG_ARDUSIMPLE_MPOLL)
 
-# Source files
+# Application sources
 
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_HTTPD),)
-CSRCS    += httpd/net.c
-MAINSRC  += httpd/httpd.c
-PROGNAME += mg_httpd
-endif
-
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_WEBSOCKD),)
-MAINSRC  += websockd/websockd.c
-PROGNAME += mg_wsockd
-endif
-
-ifneq ($(CONFIG_EXAMPLES_MONGOOSE_SMARTANT),)
-MAINSRC  += smart/httpd.c
-PROGNAME += mg_smart
-endif
-
-PRIORITY  = $(CONFIG_EXAMPLES_MONGOOSE_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_MONGOOSE_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_MONGOOSE)
+MAINSRC = mpoll.c
 
 include $(APPDIR)/Application.mk

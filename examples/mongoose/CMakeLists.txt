@@ -34,9 +34,18 @@ if (CONFIG_EXAMPLES_MONGOOSE)
 	if (CONFIG_EXAMPLES_MONGOOSE_WEBSOCKD)
 		nuttx_add_application(
 			NAME
-			mg_websockd
+			mg_wsockd
 			SRCS
 			websockd/websockd.c)
 	endif
+
+  # Smart Antenna server
+	if (CONFIG_EXAMPLES_MONGOOSE_SMARTANT)
+  nuttx_add_application(
+    NAME
+    mg_smart
+    SRCS
+    smart/httpd.c)
+endif
 
 endif()

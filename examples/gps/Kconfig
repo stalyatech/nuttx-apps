@@ -6,6 +6,7 @@
 config EXAMPLES_GPS
 	tristate "GPS example"
 	default n
+  depends on !SENSORS_UBLOX_GPS
 	select GPSUTILS_MINMEA_LIB
 	---help---
 		Enable the gps test example
