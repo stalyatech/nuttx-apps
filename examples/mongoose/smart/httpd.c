@@ -72,7 +72,7 @@
  ****************************************************************************/
 
 #define ROOT_FS	 		(&mg_fs_posix)
-#define ROOT_DIR    "/data0/web_smart_dist"
+#define ROOT_DIR    "/data0/www"
 
 /****************************************************************************
  * Private Data
@@ -148,8 +148,7 @@ static int uorb_ondata(FAR const struct orb_metadata *meta, int fd)
       /* Send the received data to the client */
 
       gps->raw_buf[gps->raw_len] = 0;
-      uorb_sendtows(gps->raw_buf, gps->raw_len, WEBSOCKET_OP_TEXT );
-
+      uorb_sendtows(gps->raw_buf, gps->raw_len, WEBSOCKET_OP_TEXT);
     }
 
   return ret;
@@ -234,12 +233,16 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data)
   /* Connection closed */
   else if (ev == MG_EV_CLOSE)
     {
-
+      /* Clear the data  */
+  
+      c->data[0] = 0;
 		}
   /* Websocket handshake done */
 	else if (ev == MG_EV_WS_OPEN)
     {
-
+      /* When WS handhake is done, mark us as WS client */
+  
+      c->data[0] = 'W';
     }
   /* Websocket msg, text or bin */
 	else if (ev == MG_EV_WS_MSG) 
@@ -256,6 +259,7 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data)
 	    	{
 					/* Upgrade to websocket. From now on, a connection is a full-duplex */
 					/* Websocket connection, which will receive MG_EV_WS_MSG events. */
+
       		mg_ws_upgrade(c, hm, NULL);
     		}
       else if (mg_match(hm->uri, mg_str("/api/login"), NULL)) 
