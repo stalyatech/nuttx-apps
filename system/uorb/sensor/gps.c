@@ -50,6 +50,18 @@ static void print_sensor_gps_message(FAR const struct orb_metadata *meta,
                message->hdop, message->vdop);
 }
 
+static void print_sensor_gps_raw_message(FAR const struct orb_metadata *meta,
+                                         FAR const void *buffer)
+{
+  FAR const struct sensor_gps_raw *message = buffer;
+  const orb_abstime now = orb_absolute_time();
+
+  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
+               "time_utc: %" PRIu64 " msg: %s",
+               meta->o_name, message->timestamp, now - message->timestamp,
+               message->time_utc, message->buf);
+}
+
 static void
 print_sensor_gps_satellite_message(FAR const struct orb_metadata *meta,
                                    FAR const void *buffer)
@@ -78,5 +90,6 @@ print_sensor_gps_satellite_message(FAR const struct orb_metadata *meta,
  ****************************************************************************/
 
 ORB_DEFINE(sensor_gps, struct sensor_gps, print_sensor_gps_message);
+ORB_DEFINE(sensor_gps_raw, struct sensor_gps_raw, print_sensor_gps_raw_message);
 ORB_DEFINE(sensor_gps_satellite, struct sensor_gps_satellite,
            print_sensor_gps_satellite_message);

@@ -34,6 +34,7 @@
 /* register this as object request broker structure */
 
 ORB_DECLARE(sensor_gps);
+ORB_DECLARE(sensor_gps_raw);
 ORB_DECLARE(sensor_gps_satellite);
 
 #endif

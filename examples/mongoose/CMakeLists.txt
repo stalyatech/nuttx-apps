@@ -41,11 +41,23 @@ if (CONFIG_EXAMPLES_MONGOOSE)
 
   # Smart Antenna server
 	if (CONFIG_EXAMPLES_MONGOOSE_SMARTANT)
-  nuttx_add_application(
-    NAME
-    mg_smart
-    SRCS
-    smart/httpd.c)
-endif
+
+    if (CONFIG_EXAMPLES_MONGOOSE_SMARTANT_UORB)
+      nuttx_add_application(
+        NAME
+        mg_smart
+        SRCS
+        smart/httpd_uorb.c)
+      endif
+
+    if (CONFIG_EXAMPLES_MONGOOSE_SMARTANT_FIFO)
+      nuttx_add_application(
+        NAME
+        mg_smart
+        SRCS
+        smart/httpd_fifo.c)
+    endif
+
+  endif
 
 endif()

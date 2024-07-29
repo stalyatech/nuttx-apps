@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/ardusimple/mpoll/mpoll.c
+ * apps/ardusimple/gpoll/gpoll.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -34,9 +34,11 @@
  * Pre-processor Definitions
  ****************************************************************************/
 #define NPOLLFDS    1
-#define FIFONDX     0
+#define GPSFIFODX   0
 
-#define POLL_LISTENER_DELAY   2000   /* 2 seconds */
+#define POLL_LISTENER_DELAY   1000   /* 1 seconds */
+
+#define MINMEA_MAX_LENGTH     128
 
 /****************************************************************************
  * Private Types
@@ -51,30 +53,30 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Name: mpoll_main
+ * Name: gpoll_main
  ****************************************************************************/
 
-static void *mpoll_main(pthread_addr_t pvarg)
+static void *gpoll_main(pthread_addr_t pvarg)
 {
   static char buffer[CONFIG_DEV_FIFO_SIZE];
   struct pollfd fds[NPOLLFDS];
+  char line[MINMEA_MAX_LENGTH];
+  int i, fd, cnt, ret;
   ssize_t nbytes;
   bool timeout;
   bool pollin;
   int nevents;
-  int fd;
-  int ret;
-  int i;
+  char ch;
 
   /* Open the FIFO for non-blocking read */
 
-  printf("mpoll_main: Opening %s for non-blocking read\n", CONFIG_ARDUSIMPLE_MPOLL_FIFO);
+  printf("gpoll_main: Opening %s for non-blocking read\n", CONFIG_ARDUSIMPLE_GPOLL_FIFO);
 
-  fd = open(CONFIG_ARDUSIMPLE_MPOLL_FIFO, O_RDONLY | O_NONBLOCK);
+  fd = open(CONFIG_ARDUSIMPLE_GPOLL_FIFO, O_RDONLY | O_NONBLOCK);
   if (fd < 0)
     {
-      printf("mpoll_main: ERROR Failed to open FIFO %s: %d\n",
-             CONFIG_ARDUSIMPLE_MPOLL_FIFO, errno);
+      printf("gpoll_main: ERROR Failed to open FIFO %s: %d\n",
+             CONFIG_ARDUSIMPLE_GPOLL_FIFO, errno);
       close(fd);
       return (FAR void *)-1;
     }
@@ -84,9 +86,9 @@ static void *mpoll_main(pthread_addr_t pvarg)
   while (1)
     {
       memset(fds, 0, sizeof(struct pollfd)*NPOLLFDS);
-      fds[FIFONDX].fd      = fd;
-      fds[FIFONDX].events  = POLLIN;
-      fds[FIFONDX].revents = 0;
+      fds[GPSFIFODX].fd      = fd;
+      fds[GPSFIFODX].events  = POLLIN;
+      fds[GPSFIFODX].revents = 0;
 
       timeout = false;
       pollin  = false;
@@ -97,16 +99,16 @@ static void *mpoll_main(pthread_addr_t pvarg)
 
       if (ret < 0)
         {
-          printf("mpoll_main: ERROR poll failed: %d\n", errno);
+          printf("gpoll_main: ERROR poll failed: %d\n", errno);
         }
       else if (ret == 0)
         {
-          printf("mpoll_main: Timeout\n");
+          printf("gpoll_main: Timeout\n");
           timeout = true;
         }
       else if (ret > NPOLLFDS)
         {
-          printf("mpoll_main: ERROR poll reported: %d\n", errno);
+          printf("gpoll_main: ERROR poll reported: %d\n", errno);
         }
       else
         {
@@ -120,7 +122,7 @@ static void *mpoll_main(pthread_addr_t pvarg)
             {
               if (fds[i].revents != 0)
                 {
-                  printf("mpoll_main: ERROR expected revents=00, "
+                  printf("gpoll_main: ERROR expected revents=00, "
                          "received revents[%d]=%08" PRIx32 "\n",
                          i, fds[i].revents);
                 }
@@ -133,14 +135,20 @@ static void *mpoll_main(pthread_addr_t pvarg)
                 }
               else if (fds[i].revents != 0)
                 {
-
+                  /*
+                  printf("gpoll_main: ERROR unexpected revents[%d]="
+                         "%08" PRIx32 "\n", i, fds[i].revents);
+                  */
                 }
             }
         }
 
       if (pollin && nevents != ret)
         {
-
+          /*
+          printf("gpoll_main: ERROR found %d events, "
+                  "poll reported %d\n", nevents, ret);
+          */
         }
 
       /* In any event, read until the pipe/serial  is empty */
@@ -161,12 +169,14 @@ static void *mpoll_main(pthread_addr_t pvarg)
                     {
                       if ((fds[i].revents & POLLIN) != 0)
                         {
-
+                          printf("gpoll_main: ERROR no read"
+                                 " data[%d]\n", i);
                         }
                     }
                   else if (errno != EINTR)
                     {
-
+                      printf("gpoll_main: read[%d] failed: %d\n",
+                             i, errno);
                     }
 
                   nbytes = 0;
@@ -175,12 +185,30 @@ static void *mpoll_main(pthread_addr_t pvarg)
                 {
                   if (timeout)
                     {
-
+                      printf("gpoll_main: ERROR? Poll timeout, "
+                              "but data read[%d]\n", i);
+                      printf("               (might just be "
+                             "a race condition)\n");
                     }
 
-                  buffer[nbytes] = '\0';
-                  printf("mpoll_main: Read[%d] '%s' (%ld bytes)\n",
-                         i, buffer, (long)nbytes);
+                  /* Read until we complete a line */
+                  cnt = 0;
+                  for (int j = 0; j < nbytes; j++)
+                    {
+                      ch = buffer[j];
+                      if ((ch != '\n') && (cnt < MINMEA_MAX_LENGTH))
+                        {
+                          line[cnt++] = ch;
+                        }
+
+                      if ((ch == '\n') && (cnt > 1))
+                        {
+                          line[cnt-1] = '\0';
+                          printf("gpoll_main: Read[%d] '%s' (%ld bytes)\n", i, line, (long)cnt-1);
+
+                          cnt = 0;      
+                        }
+                    }
                 }
 
               /* Suppress error report if no read data on the next
@@ -204,7 +232,7 @@ static void *mpoll_main(pthread_addr_t pvarg)
 }
 
 /****************************************************************************
- * Name: mpoll_main
+ * Name: gpoll_main
  ****************************************************************************/
 
 int main(int argc, FAR char *argv[])
@@ -215,13 +243,13 @@ int main(int argc, FAR char *argv[])
 
   /* Open FIFOs */
 
-  printf("\nmpoll_main: Creating FIFO %s\n", CONFIG_ARDUSIMPLE_MPOLL_FIFO);
-  ret = mkfifo(CONFIG_ARDUSIMPLE_MPOLL_FIFO, 0666);
+  printf("\ngpoll_main: Creating FIFO %s\n", CONFIG_ARDUSIMPLE_GPOLL_FIFO);
+  ret = mkfifo(CONFIG_ARDUSIMPLE_GPOLL_FIFO, 0666);
   if (ret < 0)
     {
       if (EEXIST != errno)
         {
-          printf("mpoll_main: mkfifo failed: %d\n", errno);
+          printf("gpoll_main: mkfifo failed: %d\n", errno);
           exitcode = 1;
           goto errout;          
         }
@@ -229,12 +257,12 @@ int main(int argc, FAR char *argv[])
 
   /* Start the listeners */
 
-  printf("mpoll_main: Starting listener thread\n");
+  printf("gpoll_main: Starting listener thread\n");
 
-  ret = pthread_create(&tid, NULL, mpoll_main, NULL);
+  ret = pthread_create(&tid, NULL, gpoll_main, NULL);
   if (ret != 0)
     {
-      printf("mpoll_main: Failed to create listener thread: %d\n", ret);
+      printf("gpoll_main: Failed to create listener thread: %d\n", ret);
       exitcode = 2;
       goto errout;
     }
