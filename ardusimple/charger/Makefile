@@ -1,5 +1,5 @@
 ############################################################################
-# apps/ardusimple/uorbd/Make.defs
+# apps/ardusimple/charger/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,6 +18,13 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_ARDUSIMPLE_UORBD),)
-CONFIGURED_APPS += $(APPDIR)/ardusimple/uorbd
-endif
+include $(APPDIR)/Make.defs
+-include $(SDKDIR)/Make.defs
+
+PROGNAME = $(CONFIG_ARDUSIMPLE_CHARGER_PROGNAME)
+PRIORITY = $(CONFIG_ARDUSIMPLE_CHARGER_PRIORITY)
+STACKSIZE = $(CONFIG_ARDUSIMPLE_CHARGER_STACKSIZE)
+
+MAINSRC = charger.c
+
+include $(APPDIR)/Application.mk
