@@ -173,22 +173,29 @@ int ftpd_daemon(int s_argc, char **s_argv)
   int ret = EXIT_FAILURE;
   int option;
   int family = AF_UNSPEC;
+  char ifname[IF_NAMESIZE] = {"eth0"};
 
   /* The FTPD daemon has been started */
 
   g_ftpdglob.running = true;
   printf("FTP daemon [%d] started\n", g_ftpdglob.pid);
 
-  while ((option = getopt(s_argc, &s_argv[1], "46")) != ERROR)
+  while ((option = getopt(s_argc, &s_argv[1], "46i:")) != EOF)
     {
       switch (option)
       {
         case '4':
           family = AF_INET;
           break;
+
         case '6':
           family = AF_INET6;
           break;
+
+        case 'i':
+          strncpy(ifname, optarg, IF_NAMESIZE);
+          break;
+
         default:
           break;
       }
@@ -209,7 +216,7 @@ int ftpd_daemon(int s_argc, char **s_argv)
 
   /* Open FTPD */
 
-  handle = ftpd_open(CONFIG_EXAMPLES_FTPD_PORT, family);
+  handle = ftpd_open(CONFIG_EXAMPLES_FTPD_PORT, family, ifname);
 
   if (!handle)
     {
