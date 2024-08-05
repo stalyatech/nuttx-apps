@@ -734,6 +734,7 @@ static void netinit_configure(void)
 
   netinit_set_ipaddrs("eth0");
   netinit_set_ipaddrs("wlan0");
+  netinit_set_ipaddrs("bnep0");
 
   /* That completes the 'local' initialization of the network device. */
 
@@ -742,6 +743,7 @@ static void netinit_configure(void)
 
   netinit_net_bringup("eth0");
   netinit_net_bringup("wlan0");
+  netinit_net_bringup("bnep0");
 #endif
 #endif /* NETINIT_HAVE_NETDEV */
 }

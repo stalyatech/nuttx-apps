@@ -135,6 +135,24 @@ int telnetd_daemon(FAR const struct telnetd_config_s *config)
     }
 #endif
 
+#ifdef CONFIG_NET_BINDTODEVICE
+  /* Bind socket to interface, because UDP packets have to be sent to the
+   * broadcast address at a moment when it is not possible to decide the
+   * target network device using the local or remote address (which is,
+   * by definition and purpose of DHCP, undefined yet).
+   */
+
+  if (config->ifname != NULL)
+    {
+      if (setsockopt(listensd, SOL_SOCKET, SO_BINDTODEVICE,
+                    config->ifname, strlen(config->ifname)) < 0)
+        {
+          nerr("ERROR: setsockopt SO_BINDTODEVICE failed: %d\n", errno);
+          goto errout_with_socket;
+        }      
+    }
+#endif
+
   /* Bind the socket to a local address */
 
 #ifdef CONFIG_NET_IPv4

@@ -11,11 +11,11 @@ config ARDUSIMPLE_CHARGER_DEVNAME
 	string "Charger device name"
 	default "/dev/batt0"
 	---help---
-		Set create charger device name.
+		Set the charger device name.
 
 config ARDUSIMPLE_CHARGER_PROGNAME
 	string "Program name"
-	default "as_charger"
+	default "charger"
 	---help---
 		This is the name of the program that will be use when the NSH ELF
 		program is installed.

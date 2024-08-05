@@ -52,41 +52,6 @@
  * Private Functions
  ****************************************************************************/
 
-static int show_charge_setting(int fd)
-{
-  int curr;
-  int vol;
-  int temp;
-  int ret;
-
-  ret = ioctl(fd, BATIOC_VOLTAGE, (unsigned long)(uintptr_t)&vol);
-  if (ret < 0)
-    {
-      printf("ioctl BATIOC_VOLTAGE failed. %d\n", errno);
-      return -1;
-    }
-
-  ret = ioctl(fd, BATIOC_CURRENT, (unsigned long)(uintptr_t)&curr);
-  if (ret < 0)
-    {
-      printf("ioctl GET_CHGCURRENT failed. %d\n", errno);
-      return -1;
-    }
-
-  ret = ioctl(fd, BATIOC_TEMPERATURE, (unsigned long)(uintptr_t)&temp);
-  if (ret < 0)
-    {
-      printf("ioctl BATIOC_TEMPERATURE failed. %d\n", errno);
-      return -1;
-    }
-
-  printf("Charge voltage: %d\n", vol);
-  printf("Charge current: %d\n", curr);
-  printf("Temperature   : %d\n", temp);
-
-  return 0;
-}
-
 /****************************************************************************
  * show_bat_status
  ****************************************************************************/
@@ -153,7 +118,6 @@ static int show_bat_status(int fd)
 int main(int argc, FAR char *argv[])
 {
   int opt, verbose = 0;
-  struct timeval tv;
   int current;
   int voltage;
   int fd, ret;
@@ -184,7 +148,10 @@ int main(int argc, FAR char *argv[])
 
   /* Show the battery status */
 
-  show_bat_status(fd);
+  if (verbose)
+    {
+      show_bat_status(fd);
+    }
 
   /* Set the input current limit (mA) */
 
@@ -226,17 +193,7 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
-  /* Set system off mode */
-
-  op = BATIO_OPRTN_SYSOFF;
-  ret = ioctl(fd, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
-  if (ret < 0)
-    {
-      printf("ioctl BATIOC_OPERATE failed. %d\n", errno);
-      return 1;
-    }
-
-  /* Set system on mode */
+  /* Set system on mode (BATFET enable) */
 
   op = BATIO_OPRTN_SYSON;
   ret = ioctl(fd, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
@@ -246,13 +203,18 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
-  gettimeofday(&tv, NULL);
-  printf("%ju.%06ld: %d mV, %d mA\n",
-         (uintmax_t)tv.tv_sec, tv.tv_usec, voltage, current);
-
   /* Show the battery status */
 
-  show_bat_status(fd);
+  if (verbose)
+    {
+      struct timeval tv;
+
+      gettimeofday(&tv, NULL);
+      printf("%ju.%06ld: %d mV, %d mA\n",
+            (uintmax_t)tv.tv_sec, tv.tv_usec, voltage, current);
+
+      show_bat_status(fd);
+    }
 
   close(fd);
 

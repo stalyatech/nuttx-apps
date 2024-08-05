@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/netutils/netinit/netinit_associate.c
+ * apps/ardusimple/tone/tone.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,65 +18,37 @@
  *
  ****************************************************************************/
 
+#ifndef __APPS_ARDUSIMPLE_TONE_TONE_H
+#define __APPS_ARDUSIMPLE_TONE_TONE_H
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
 
-#include <nuttx/wireless/wireless.h>
+#ifndef CONFIG_PWM
+#  error "PWM device support is not enabled (CONFIG_PWM)"
+#endif
 
-#include "wireless/wapi.h"
-#include "netutils/netinit.h"
-
-#ifdef CONFIG_WIRELESS_WAPI
+#ifndef CONFIG_ARDUSIMPLE_TONE_DEVPATH
+#  define CONFIG_ARDUSIMPLE_TONE_DEVPATH "/dev/pwm0"
+#endif
 
 /****************************************************************************
- * Public Functions
+ * Public Types
  ****************************************************************************/
 
 /****************************************************************************
- * Name: netinit_associate
+ * Public Data
  ****************************************************************************/
 
-int netinit_associate(FAR const char *ifname)
-{
-  struct wpa_wconfig_s conf;
-  int ret = -EINVAL;
-  FAR void *load;
+/****************************************************************************
+ * Public Function Prototypes
+ ****************************************************************************/
 
-  load = wapi_load_config(ifname, NULL, &conf);
-  if (!load)
-    {
-      conf.ifname      = ifname;
-      conf.sta_mode    = CONFIG_NETINIT_WAPI_STAMODE;
-      conf.auth_wpa    = CONFIG_NETINIT_WAPI_AUTHWPA;
-      conf.cipher_mode = CONFIG_NETINIT_WAPI_CIPHERMODE;
-      conf.alg         = CONFIG_NETINIT_WAPI_ALG;
-      conf.ssid        = CONFIG_NETINIT_WAPI_SSID;
-      conf.passphrase  = CONFIG_NETINIT_WAPI_PASSPHRASE;
-      conf.ssidlen     = strlen(conf.ssid);
-      conf.phraselen   = strlen(conf.passphrase);
-      conf.bssid       = NULL;
-    }
-
-  if (conf.ssidlen > 0)
-    {
-      /* Check the interface name */
-
-      if (strncmp(ifname, "wlan", 4) == 0)
-        {
-          ret = wpa_driver_wext_associate(&conf);
-        }
-    }
-
-  wapi_unload_config(load);
-
-  return ret;
-}
-
-#endif /* CONFIG_WIRELESS_WAPI */
+#endif /* __APPS_ARDUSIMPLE_TONE_TONE_H */
