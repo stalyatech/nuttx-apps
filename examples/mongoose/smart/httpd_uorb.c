@@ -409,7 +409,7 @@ int main(int argc, FAR char *argv[])
 
   if (gps_enab)
     {
-      fds = sensor_subscribe("sensor_gps_raw0", 100, 0);
+      fds = sensor_subscribe("sensor_gps_raw0", 10000, 0);
     }
 
   /* Initialize the options */

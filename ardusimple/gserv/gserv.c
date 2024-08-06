@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 
 #include <stdio.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <termios.h>
 
@@ -36,7 +37,8 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MINMEA_MAX_LENGTH    256
+#define NMEA_MAX_LENGTH   84
+#define BUFF_MAX_LENGTH   1024
 
 /****************************************************************************
  * Private Types
@@ -49,6 +51,78 @@
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: hex2int
+ ****************************************************************************/
+
+static int hex2int(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    return -1;
+}
+
+/****************************************************************************
+ * Name: nmea_check
+ ****************************************************************************/
+
+static bool nmea_check(const char *sentence, bool strict)
+{
+  uint8_t checksum = 0x00;
+
+  /* A valid sentence starts with "$". */
+  if (*sentence++ != '$')
+    {
+      return false;      
+    }
+
+  /* The optional checksum is an XOR of all bytes between "$" and "*". */
+  while (*sentence && *sentence != '*' && isprint((unsigned char) *sentence))
+    {
+      checksum ^= *sentence++;      
+    }
+
+  /* If checksum is present... */
+  if (*sentence == '*') 
+    {
+      // Extract checksum.
+      sentence++;
+      int upper = hex2int(*sentence++);
+      if (upper == -1)
+          return false;
+      int lower = hex2int(*sentence++);
+      if (lower == -1)
+          return false;
+      int expected = upper << 4 | lower;
+
+      // Check for checksum mismatch.
+      if (checksum != expected)
+          return false;
+    } 
+  else if (strict) 
+    {
+      /* Discard non-checksummed frames in strict mode. */
+      return false;
+    }
+
+  // The only stuff allowed at this point is a newline.
+  while (*sentence == '\r' || *sentence == '\n') 
+    {
+      sentence++;
+    }
+  
+  if (*sentence) 
+    {
+      return false;
+    }
+
+  return true;
+}
 
 /****************************************************************************
  * Name: open_serial
@@ -185,8 +259,9 @@ static int open_serial(void)
 
 int main(int argc, FAR char *argv[])
 {
-  char line[MINMEA_MAX_LENGTH];
-  int nbytes, cnt, ret;
+  static uint8_t buff[BUFF_MAX_LENGTH];
+  char line[NMEA_MAX_LENGTH];
+  int nbytes, cnt, idx, ret;
   int fd_f = -1;
   int fd_g = -1;
   int exitcode = 0;
@@ -232,33 +307,53 @@ int main(int argc, FAR char *argv[])
 
   for (; ; )
     {
-      /* Read until we complete a line */
+      /* Read GPS data to the temporary buffer */
 
-      cnt = 0;
-      do
+      nbytes = read(fd_g, buff, BUFF_MAX_LENGTH);
+      idx = 0;
+
+      /* Wait till all data have been processed */
+
+      while (nbytes > 0)
         {
-          ret = read(fd_g, &ch, 1);
-          if (ret == 1)
+          /* Continue until we complete a line */
+
+          cnt = 0;
+          do
             {
+              ch = buff[idx++];
               line[cnt++] = ch;
             }
-        }
-      while (ch != '\n');
-      line[cnt] = '\0';
+          while ((ch != '\n') && (cnt < NMEA_MAX_LENGTH));
+          line[cnt] = '\0';
 
-      /* Write a message to the FIFO ... 
-       * this should wake the listener from the poll.
-       */
-      if (cnt > 0)
-        {
-          nbytes = write(fd_f, line, cnt);
-          if (nbytes < 0)
+          /* Check the frame */
+
+          if (nmea_check(line, true))
             {
-              printf("gserv_main: Write to FIFO failed: %d\n", errno);
-              exitcode = 4;
-              goto errout;
+              
+              /* Write a message to the FIFO ... 
+               * this should wake the listener from the poll.
+               */
+              ret = write(fd_f, line, cnt);
+              if (ret != cnt)
+                {
+                  printf("gserv_main: Write to FIFO failed: %d\n", errno);
+                  exitcode = 4;
+                  goto errout;
+                }
             }
-        }
+          else
+            {
+              /* Wrong frame format */
+
+              line[cnt] = 0;              
+            }
+
+          /* Update the processed bytes */
+
+          nbytes -= cnt;
+        }  
     }
 
 errout:

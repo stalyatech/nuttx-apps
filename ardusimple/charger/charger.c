@@ -35,6 +35,8 @@
 
 #include <nuttx/power/battery_charger.h>
 #include <nuttx/power/battery_ioctl.h>
+#include <nuttx/analog/adc.h>
+#include <nuttx/analog/ioctl.h>
 
 #include <arch/board/board.h>
 
@@ -43,9 +45,19 @@
  ****************************************************************************/
 
 #ifdef CONFIG_EXAMPLES_CHARGER_DEVNAME
-#  define DEVPATH CONFIG_EXAMPLES_CHARGER_DEVNAME
+#  define CHARGER_DEVPATH CONFIG_EXAMPLES_CHARGER_DEVNAME
 #else
-#  define DEVPATH "/dev/batt0"
+#  define CHARGER_DEVPATH "/dev/batt0"
+#endif
+
+#ifdef CONFIG_EXAMPLES_ADC_DEVNAME
+#  define ADC_DEVPATH CONFIG_EXAMPLES_ADC_DEVNAME
+#else
+#  define ADC_DEVPATH "/dev/adc0"
+#endif
+
+#ifndef CONFIG_ADC_GROUPSIZE
+#  define CONFIG_ADC_GROUPSIZE 2
 #endif
 
 /****************************************************************************
@@ -117,11 +129,16 @@ static int show_bat_status(int fd)
 
 int main(int argc, FAR char *argv[])
 {
+  struct adc_msg_s sample[CONFIG_ADC_GROUPSIZE];
   int opt, verbose = 0;
+  size_t readsize;
+  ssize_t nbytes;
   int current;
   int voltage;
-  int fd, ret;
-  int op;
+  int fd_conf;
+  int fd_meas;
+  int ret, op;
+  int errval = 0;
 
   while ((opt = getopt(argc, argv, "v")) != -1)
     {
@@ -139,68 +156,74 @@ int main(int argc, FAR char *argv[])
 
   /* open the battery charger device */
 
-  fd = open(DEVPATH, O_RDWR);
-  if (fd < 0)
+  fd_conf = open(CHARGER_DEVPATH, O_RDWR);
+  if (fd_conf < 0)
     {
-      printf("Device open error.\n");
-      return 0;
+      errval = errno;
+      printf("Charger device open error.\n");
+      return errval;
     }
 
   /* Show the battery status */
 
   if (verbose)
     {
-      show_bat_status(fd);
+      show_bat_status(fd_conf);
     }
 
   /* Set the input current limit (mA) */
 
   current = 1000;
-  ret = ioctl(fd, BATIOC_INPUT_CURRENT, (unsigned long)(uintptr_t)&current);
+  ret = ioctl(fd_conf, BATIOC_INPUT_CURRENT, (unsigned long)(uintptr_t)&current);
   if (ret < 0)
     {
-      printf("ioctl BATIOC_INPUT_CURRENT failed. %d\n", errno);
-      return 1;
+      errval = errno;
+      printf("ioctl BATIOC_INPUT_CURRENT failed. %d\n", errval);
+      goto errout_conf;
     }
 
   /* Set the charge current (mA) */
 
   current = 500;
-  ret = ioctl(fd, BATIOC_CURRENT, (unsigned long)(uintptr_t)&current);
+  ret = ioctl(fd_conf, BATIOC_CURRENT, (unsigned long)(uintptr_t)&current);
   if (ret < 0)
     {
-      printf("ioctl BATIOC_CURRENT failed. %d\n", errno);
-      return 1;
+      errval = errno;
+      printf("ioctl BATIOC_CURRENT failed. %d\n", errval);
+      goto errout_conf;
     }
 
   /* Set the charge voltage (mV) */
 
   voltage = 4200;
-  ret = ioctl(fd, BATIOC_VOLTAGE, (unsigned long)(uintptr_t)&voltage);
+  ret = ioctl(fd_conf, BATIOC_VOLTAGE, (unsigned long)(uintptr_t)&voltage);
   if (ret < 0)
     {
-      printf("ioctl BATIOC_VOLTAGE failed. %d\n", errno);
-      return 1;
+      errval = errno;
+      printf("ioctl BATIOC_VOLTAGE failed. %d\n", errval);
+      goto errout_conf;
     }
 
   /* Set charging mode */
 
   op = BATIO_OPRTN_CHARGE;
-  ret = ioctl(fd, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
+  ret = ioctl(fd_conf, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
   if (ret < 0)
     {
-      printf("ioctl BATIOC_OPERATE failed. %d\n", errno);
-      return 1;
+      errval = errno;
+      printf("ioctl BATIOC_OPERATE failed. %d\n", errval);
+      goto errout_conf;
     }
 
   /* Set system on mode (BATFET enable) */
 
   op = BATIO_OPRTN_SYSON;
-  ret = ioctl(fd, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
+  ret = ioctl(fd_conf, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
   if (ret < 0)
     {
-      printf("ioctl BATIOC_OPERATE failed. %d\n", errno);
-      return 1;
+      errval = errno;
+      printf("ioctl BATIOC_OPERATE failed. %d\n", errval);
+      goto errout_conf;
     }
 
   /* Show the battery status */
@@ -213,10 +236,69 @@ int main(int argc, FAR char *argv[])
       printf("%ju.%06ld: %d mV, %d mA\n",
             (uintmax_t)tv.tv_sec, tv.tv_usec, voltage, current);
 
-      show_bat_status(fd);
+      show_bat_status(fd_conf);
     }
 
-  close(fd);
+  /* open the adc device */
 
-  return 0;
+  fd_meas = open(ADC_DEVPATH, O_RDWR);
+  if (fd_meas < 0)
+    {
+      errval = errno;
+      printf("ADC device open error.\n");
+      goto errout_conf;
+    }
+
+/* Measure the battery voltage forever*/
+
+while (1)
+  {
+    /* Issue the software trigger to start ADC conversion */
+
+    ret = ioctl(fd_meas, ANIOC_TRIGGER, 0);
+    if (ret < 0)
+      {
+          break;
+      }
+
+    /* Read up to CONFIG_ADC_GROUPSIZE samples */
+
+    readsize = CONFIG_ADC_GROUPSIZE * sizeof(struct adc_msg_s);
+    nbytes = read(fd_meas, sample, readsize);
+
+    /* Handle unexpected return values */
+
+    if (nbytes < 0)
+      {
+        errval = errno;
+        if (errval != EINTR)
+          {
+            errval = 3;
+            goto errout_meas;
+          }
+      }
+
+    /* Print the sample data on successful return */
+
+    else if (nbytes > 0)
+      {
+        int nsamples = nbytes / sizeof(struct adc_msg_s);
+        if (nsamples * sizeof(struct adc_msg_s) == nbytes)
+          {
+
+          }
+      }
+
+    /* Wait for a while */
+
+    sleep(1);
+  }
+
+errout_meas:
+  close(fd_meas);
+
+errout_conf:
+  close(fd_conf);
+
+  return errval;
 }
