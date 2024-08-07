@@ -148,6 +148,17 @@ static int uorb_ondata(FAR const struct orb_metadata *meta, int fd)
       /* Send the received data to the client */
 
       send_to_ws(gps->buf, gps->len, WEBSOCKET_OP_TEXT);
+
+      /* Send the received data to the console */
+      
+      #if 0
+      printf((const char *)gps->buf);
+      fflush(stdout);
+      #endif
+
+      /* Skip the read data */
+
+      orb_ioctl(fd, SNIOC_SKIP_BUFFER, (unsigned long)(uintptr_t)&meta->o_size);
     }
 
   return ret;
@@ -208,6 +219,28 @@ static struct pollfd *sensor_subscribe(FAR const char *topic_name,
   fds->events = POLLIN;
 
   return fds;
+}
+
+/****************************************************************************
+ * Name: sensor_poll
+ ****************************************************************************/
+
+static void sensor_poll(void *param) 
+{
+  struct pollfd *fds = (struct pollfd *)param;
+
+  /* Check the uORB topic event */
+
+  if (fds != NULL)
+    {
+      while (poll(fds, 1, 0) > 0)
+        {
+          if (fds->revents & POLLIN)
+            {
+              uorb_ondata(g_uorb_obj.meta, fds->fd);
+            }
+        }
+    }
 }
 
 /****************************************************************************
@@ -409,7 +442,7 @@ int main(int argc, FAR char *argv[])
 
   if (gps_enab)
     {
-      fds = sensor_subscribe("sensor_gps_raw0", 10000, 0);
+      fds = sensor_subscribe("sensor_gps_raw0", 100, 0);
     }
 
   /* Initialize the options */
@@ -431,26 +464,19 @@ int main(int argc, FAR char *argv[])
   snprintf(hosturl, sizeof(hosturl), "http://0.0.0.0:%d", port);
   mg_http_listen(&g_evt_mgr, hosturl, ev_handler, NULL);
 
+  /* Add the sensor poll timer */
+
+  mg_timer_add(&g_evt_mgr, 10, 
+               MG_TIMER_RUN_NOW | MG_TIMER_REPEAT, 
+               sensor_poll, fds);
+
   /* Infinite event loop */
 
   while (1)
     {
       /* Event manager poll */
 
-      mg_mgr_poll(&g_evt_mgr, 10);
-
-      /* Check the uORB topic event */
-
-      if ((fds != NULL) && (poll(fds, 1, 0) > 0))
-        {
-          if (fds->revents & POLLIN)
-            {
-              if (uorb_ondata(g_uorb_obj.meta, fds->fd) != 0)
-                {
-                    
-                }
-            }
-        }
+      mg_mgr_poll(&g_evt_mgr, 100);
     }
 
 errout:

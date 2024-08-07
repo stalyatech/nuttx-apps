@@ -83,7 +83,7 @@
 
 #define POLL_DELAY  1000   /* 1 seconds */
 
-#define NMEA_MAXLEN 84
+#define NMEA_MAXLEN 116
 
 /****************************************************************************
  * Private Data
