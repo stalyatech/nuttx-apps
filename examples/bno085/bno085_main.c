@@ -95,7 +95,7 @@ int open_sensor(void)
 
   /* Open lowerhalf file to be able to read the data */
 
-  fd = open("/dev/sensor0", O_RDONLY | O_NONBLOCK);
+  fd = open(CONFIG_EXAMPLES_BNO085_DEVPATH, O_RDONLY | O_NONBLOCK);
   if (fd < 0)
     {
       fprintf(stderr, "Failed to open smart sensor, errno=%d\n",
