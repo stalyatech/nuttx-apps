@@ -71,8 +71,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define ROOT_FS	 		(&mg_fs_posix)
-#define ROOT_DIR    "/data0/www"
+#define ROOT_FS	 		  (&mg_fs_posix)
+#define ROOT_DIR      "/data0/www"
+
+#define NPOLLFDS      1
+#define POLL_DELAY    1
+#define FRAME_HDRLEN  9
 
 /****************************************************************************
  * Private Data
@@ -105,7 +109,9 @@ static char g_root_dir[32];
 static size_t send_to_ws(FAR const void *buf, size_t len, int op)
 {
   struct mg_mgr *mgr = (struct mg_mgr *) &g_evt_mgr;
-  
+  char msg_hdr[FRAME_HDRLEN+1] = "nmea.XXX#";
+  char *msg_buf = (char *)buf;
+    
   /* Traverse over all connections */
 
   for (struct mg_connection *c = mgr->conns; c != NULL; c = c->next) 
@@ -114,7 +120,36 @@ static size_t send_to_ws(FAR const void *buf, size_t len, int op)
 
       if (c->data[0] == 'W') 
         {
-          return mg_ws_send(c, buf, len, op);
+          size_t msg_len = len + FRAME_HDRLEN;
+
+          /* Prepare the formatted message */
+
+          if (msg_len < SENSOR_GPS_RAWDATA_SIZE)
+            {
+              /* prepare the header */
+
+              msg_hdr[5] = msg_buf[3];
+              msg_hdr[6] = msg_buf[4];
+              msg_hdr[7] = msg_buf[5];
+
+              /* shift the incoming message */
+
+              memmove(&msg_buf[FRAME_HDRLEN], msg_buf, len);
+
+              /* copy the frame header */
+
+              memcpy(msg_buf, msg_hdr, FRAME_HDRLEN);
+
+              /* send the message to the client */
+
+              return mg_ws_send(c, msg_buf, msg_len, op);
+            }
+          else
+            {
+              /* just for debug */
+
+              msg_hdr[0] = 0;
+            }
         }
     }
 
@@ -145,16 +180,16 @@ static int uorb_ondata(FAR const struct orb_metadata *meta, int fd)
   ret = orb_copy(meta, fd, buffer);
   if (ret == OK)
     {
-      /* Send the received data to the client */
-
-      send_to_ws(gps->buf, gps->len, WEBSOCKET_OP_TEXT);
-
       /* Send the received data to the console */
       
-      #if 0
+      #if 1
       printf((const char *)gps->buf);
       fflush(stdout);
       #endif
+
+      /* Send the received data to the client */
+
+      send_to_ws(gps->buf, gps->len, WEBSOCKET_OP_TEXT);
 
       /* Skip the read data */
 
@@ -233,11 +268,14 @@ static void sensor_poll(void *param)
 
   if (fds != NULL)
     {
-      while (poll(fds, 1, 0) > 0)
+      while (poll(fds, NPOLLFDS, POLL_DELAY) == NPOLLFDS)
         {
           if (fds->revents & POLLIN)
             {
-              uorb_ondata(g_uorb_obj.meta, fds->fd);
+              if (uorb_ondata(g_uorb_obj.meta, fds->fd) < 0)
+                {
+                  break;
+                }
             }
         }
     }
