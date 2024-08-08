@@ -195,6 +195,10 @@
 #  define NETINIT_HAVE_NETDEV
 #endif
 
+/* Local name will be used */
+
+#undef NET_DEVNAME
+
 /* If we have no network device (perhaps only USRSOCK, local loopback, or
  * Netlink sockets), then we cannot support the network monitor.
  */
@@ -288,7 +292,7 @@ static const uint16_t g_ipv6_netmask[8] =
 
 #if defined(NETINIT_HAVE_NETDEV) && defined(CONFIG_NETINIT_NOMAC) && \
     defined(HAVE_MAC)
-static void netinit_set_macaddr(void)
+static void netinit_set_macaddr(FAR const char *ifname)
 {
 #if defined(CONFIG_NETINIT_UIDMAC)
   uint8_t uid[CONFIG_BOARDCTL_UNIQUEID_SIZE];
@@ -303,7 +307,7 @@ static void netinit_set_macaddr(void)
 #if defined(CONFIG_NETINIT_UIDMAC)
   boardctl(BOARDIOC_UNIQUEID, (uintptr_t)&uid);
   uid[0] = (uid[0] & 0b11110000) | 2; /* Locally Administered MAC */
-  netlib_setmacaddr(NET_DEVNAME, uid);
+  netlib_setmacaddr(ifname, uid);
 
 #elif defined(CONFIG_NET_ETHERNET)
   /* Use the configured, fixed MAC address */
@@ -318,7 +322,7 @@ static void netinit_set_macaddr(void)
 
   /* Set the MAC address */
 
-  netlib_setmacaddr(NET_DEVNAME, mac);
+  netlib_setmacaddr(ifname, mac);
 
 #elif defined(HAVE_EADDR)
   /* Use the configured, fixed extended address */
@@ -335,11 +339,11 @@ static void netinit_set_macaddr(void)
 
   /* Set the 6LoWPAN extended address */
 
-  netlib_seteaddr(NET_DEVNAME, eaddr);
+  netlib_seteaddr(ifname, eaddr);
 #endif /* CONFIG_NET_ETHERNET or HAVE_EADDR */
 }
 #else
-#  define netinit_set_macaddr()
+#  define netinit_set_macaddr(ifname)
 #endif
 
 #if defined(CONFIG_NETINIT_THREAD) && CONFIG_NETINIT_RETRY_MOUNTPATH > 0
@@ -376,7 +380,7 @@ static inline void netinit_checkpath(void)
 
 #if defined(NETINIT_HAVE_NETDEV) && !defined(CONFIG_NET_6LOWPAN) && ! \
     defined(CONFIG_NET_IEEE802154) && defined(CONFIG_NET_IPv4)
-static inline void netinit_set_ipv4addrs(void)
+static inline void netinit_set_ipv4addrs(FAR const char *ifname)
 {
   struct in_addr addr;
 #ifdef CONFIG_FSUTILS_IPCFG
@@ -391,7 +395,7 @@ static inline void netinit_set_ipv4addrs(void)
   netinit_checkpath();
 #endif
 
-  ret = ipcfg_read(NET_DEVNAME, (FAR struct ipcfg_s *)&ipv4cfg, AF_INET);
+  ret = ipcfg_read(ifname, (FAR struct ipcfg_s *)&ipv4cfg, AF_INET);
 #ifdef CONFIG_NETUTILS_DHCPC
   if (ret >= 0 && ipv4cfg.proto != IPv4PROTO_NONE)
 #else
@@ -433,7 +437,7 @@ static inline void netinit_set_ipv4addrs(void)
 #endif
         }
 
-      netlib_set_ipv4addr(NET_DEVNAME, &addr);
+      netlib_set_ipv4addr(ifname, &addr);
 
       /* Set up the remaining addresses */
 
@@ -442,12 +446,12 @@ static inline void netinit_set_ipv4addrs(void)
           /* Set up the default router address */
 
           addr.s_addr = ipv4cfg.router;
-          netlib_set_dripv4addr(NET_DEVNAME, &addr);
+          netlib_set_dripv4addr(ifname, &addr);
 
           /* Setup the subnet mask */
 
           addr.s_addr = ipv4cfg.netmask;
-          netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+          netlib_set_ipv4netmask(ifname, &addr);
         }
 
 #ifdef CONFIG_NETUTILS_DHCPC
@@ -460,8 +464,8 @@ static inline void netinit_set_ipv4addrs(void)
           /* Set up the default router address and sub-net mask */
 
           addr.s_addr = 0;
-          netlib_set_dripv4addr(NET_DEVNAME, &addr);
-          netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+          netlib_set_dripv4addr(ifname, &addr);
+          netlib_set_ipv4netmask(ifname, &addr);
         }
 #endif
       else
@@ -469,12 +473,12 @@ static inline void netinit_set_ipv4addrs(void)
           /* Otherwise, set up the configured default router address */
 
           addr.s_addr = HTONL(CONFIG_NETINIT_DRIPADDR);
-          netlib_set_dripv4addr(NET_DEVNAME, &addr);
+          netlib_set_dripv4addr(ifname, &addr);
 
           /* Setup the subnet mask */
 
           addr.s_addr = HTONL(CONFIG_NETINIT_NETMASK);
-          netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+          netlib_set_ipv4netmask(ifname, &addr);
         }
 
 #ifdef CONFIG_NETINIT_DNS
@@ -505,17 +509,17 @@ static inline void netinit_set_ipv4addrs(void)
 #else
       addr.s_addr = HTONL(CONFIG_NETINIT_IPADDR);
 #endif
-      netlib_set_ipv4addr(NET_DEVNAME, &addr);
+      netlib_set_ipv4addr(ifname, &addr);
 
       /* Set up the default router address */
 
       addr.s_addr = HTONL(CONFIG_NETINIT_DRIPADDR);
-      netlib_set_dripv4addr(NET_DEVNAME, &addr);
+      netlib_set_dripv4addr(ifname, &addr);
 
       /* Setup the subnet mask */
 
       addr.s_addr = HTONL(CONFIG_NETINIT_NETMASK);
-      netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+      netlib_set_ipv4netmask(ifname, &addr);
 
 #ifdef CONFIG_NETINIT_DNS
       addr.s_addr = HTONL(CONFIG_NETINIT_DNSIPADDR);
@@ -535,7 +539,7 @@ static inline void netinit_set_ipv4addrs(void)
 
 #if defined(NETINIT_HAVE_NETDEV) && !defined(CONFIG_NET_6LOWPAN) && ! \
     defined(CONFIG_NET_IEEE802154) && defined(CONFIG_NET_IPv6)
-static inline void netinit_set_ipv6addrs(void)
+static inline void netinit_set_ipv6addrs(FAR const char *ifname)
 {
 #ifndef CONFIG_NET_ICMPv6_AUTOCONF
 #ifdef CONFIG_FSUTILS_IPCFG
@@ -552,37 +556,37 @@ static inline void netinit_set_ipv6addrs(void)
   netinit_checkpath();
 #endif
 
-  ret = ipcfg_read(NET_DEVNAME, (FAR struct ipcfg_s *)&ipv6cfg, AF_INET6);
+  ret = ipcfg_read(ifname, (FAR struct ipcfg_s *)&ipv6cfg, AF_INET6);
   if (ret >= 0 && IPCFG_HAVE_STATIC(ipv6cfg.proto))
     {
       /* Set up our fixed host address */
 
-      netlib_set_ipv6addr(NET_DEVNAME, &ipv6cfg.ipaddr);
+      netlib_set_ipv6addr(ifname, &ipv6cfg.ipaddr);
 
       /* Set up the default router address */
 
-      netlib_set_dripv6addr(NET_DEVNAME, &ipv6cfg.router);
+      netlib_set_dripv6addr(ifname, &ipv6cfg.router);
 
       /* Setup the subnet mask */
 
-      netlib_set_ipv6netmask(NET_DEVNAME, &ipv6cfg.netmask);
+      netlib_set_ipv6netmask(ifname, &ipv6cfg.netmask);
     }
   else
 #endif
     {
       /* Set up our fixed host address */
 
-      netlib_set_ipv6addr(NET_DEVNAME,
+      netlib_set_ipv6addr(ifname,
                           (FAR const struct in6_addr *)g_ipv6_hostaddr);
 
       /* Set up the default router address */
 
-      netlib_set_dripv6addr(NET_DEVNAME,
+      netlib_set_dripv6addr(ifname,
                             (FAR const struct in6_addr *)g_ipv6_draddr);
 
       /* Setup the subnet mask */
 
-      netlib_set_ipv6netmask(NET_DEVNAME,
+      netlib_set_ipv6netmask(ifname,
                             (FAR const struct in6_addr *)g_ipv6_netmask);
     }
 #endif /* CONFIG_NET_ICMPv6_AUTOCONF */
@@ -602,18 +606,18 @@ static inline void netinit_set_ipv6addrs(void)
 
 #if defined(NETINIT_HAVE_NETDEV) && !defined(CONFIG_NET_6LOWPAN) && ! \
     defined(CONFIG_NET_IEEE802154)
-static void netinit_set_ipaddrs(void)
+static void netinit_set_ipaddrs(FAR const char *ifname)
 {
 #ifdef CONFIG_NET_IPv4
-  netinit_set_ipv4addrs();
+  netinit_set_ipv4addrs(ifname);
 #endif
 
 #ifdef CONFIG_NET_IPv6
-  netinit_set_ipv6addrs();
+  netinit_set_ipv6addrs(ifname);
 #endif
 }
 #else
-#  define netinit_set_ipaddrs()
+#  define netinit_set_ipaddrs(ifname)
 #endif
 
 /****************************************************************************
@@ -625,7 +629,7 @@ static void netinit_set_ipaddrs(void)
  ****************************************************************************/
 
 #if defined(NETINIT_HAVE_NETDEV) && !defined(CONFIG_NETINIT_NETLOCAL)
-static void netinit_net_bringup(void)
+static void netinit_net_bringup(FAR const char *ifname)
 {
 #ifdef CONFIG_NETUTILS_DHCPC
   uint8_t mac[IFHWADDRLEN];
@@ -635,7 +639,7 @@ static void netinit_net_bringup(void)
 
   /* Bring the network up. */
 
-  if (netlib_ifup(NET_DEVNAME) < 0)
+  if (netlib_ifup(ifname) < 0)
     {
       return;
     }
@@ -643,7 +647,7 @@ static void netinit_net_bringup(void)
 #if defined(CONFIG_WIRELESS_WAPI) && defined(CONFIG_DRIVERS_IEEE80211)
   /* Associate the wlan with an access point. */
 
-  if (netinit_associate(NET_DEVNAME) < 0)
+  if (netinit_associate(ifname) < 0)
     {
       return;
     }
@@ -652,7 +656,7 @@ static void netinit_net_bringup(void)
 #ifdef CONFIG_NET_ICMPv6_AUTOCONF
   /* Perform ICMPv6 auto-configuration */
 
-  netlib_icmpv6_autoconfiguration(NET_DEVNAME);
+  netlib_icmpv6_autoconfiguration(ifname);
 #endif
 
 #ifdef CONFIG_NETUTILS_DHCPC
@@ -660,11 +664,11 @@ static void netinit_net_bringup(void)
     {
       /* Get the MAC address of the NIC */
 
-      netlib_getmacaddr(NET_DEVNAME, mac);
+      netlib_getmacaddr(ifname, mac);
 
       /* Set up the DHCPC modules */
 
-      handle = dhcpc_open(NET_DEVNAME, &mac, IFHWADDRLEN);
+      handle = dhcpc_open(ifname, &mac, IFHWADDRLEN);
       if (handle == NULL)
         {
           return;
@@ -677,16 +681,16 @@ static void netinit_net_bringup(void)
 
       if (dhcpc_request(handle, &ds) == OK)
         {
-          netlib_set_ipv4addr(NET_DEVNAME, &ds.ipaddr);
+          netlib_set_ipv4addr(ifname, &ds.ipaddr);
 
           if (ds.netmask.s_addr != 0)
             {
-              netlib_set_ipv4netmask(NET_DEVNAME, &ds.netmask);
+              netlib_set_ipv4netmask(ifname, &ds.netmask);
             }
 
           if (ds.default_router.s_addr != 0)
             {
-              netlib_set_dripv4addr(NET_DEVNAME, &ds.default_router);
+              netlib_set_dripv4addr(ifname, &ds.default_router);
             }
 
           if (ds.dnsaddr.s_addr != 0)
@@ -706,7 +710,7 @@ static void netinit_net_bringup(void)
 #endif
 }
 #else
-#  define netinit_net_bringup()
+#  define netinit_net_bringup(ifname)
 #endif
 
 /****************************************************************************
@@ -722,18 +726,24 @@ static void netinit_configure(void)
 #ifdef NETINIT_HAVE_NETDEV
   /* Many embedded network interfaces must have a software assigned MAC */
 
-  netinit_set_macaddr();
+  netinit_set_macaddr("eth0");
+
+  /* Use WiFi module MAC address */
 
   /* Set up IP addresses */
 
-  netinit_set_ipaddrs();
+  netinit_set_ipaddrs("eth0");
+  netinit_set_ipaddrs("wlan0");
+  netinit_set_ipaddrs("bnep0");
 
   /* That completes the 'local' initialization of the network device. */
 
 #ifndef CONFIG_NETINIT_NETLOCAL
   /* Bring the network up. */
 
-  netinit_net_bringup();
+  netinit_net_bringup("eth0");
+  netinit_net_bringup("wlan0");
+  netinit_net_bringup("bnep0");
 #endif
 #endif /* NETINIT_HAVE_NETDEV */
 }
@@ -830,7 +840,7 @@ static int netinit_monitor(void)
       /* Configure to receive a signal on changes in link status */
 
       memset(&ifr, 0, sizeof(struct ifreq));
-      strlcpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
+      strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
 
       ifr.ifr_mii_notify_event.sigev_notify = SIGEV_SIGNAL;
       ifr.ifr_mii_notify_event.sigev_signo  = CONFIG_NETINIT_SIGNO;
