@@ -56,10 +56,9 @@ static void print_sensor_gps_raw_message(FAR const struct orb_metadata *meta,
   FAR const struct sensor_gps_raw *message = buffer;
   const orb_abstime now = orb_absolute_time();
 
-  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
-               "time_utc: %" PRIu64 " msg: %s",
+  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) msg: %s",
                meta->o_name, message->timestamp, now - message->timestamp,
-               message->time_utc, message->buf);
+               message->buf);
 }
 
 static void
