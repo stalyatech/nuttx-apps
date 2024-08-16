@@ -1224,7 +1224,7 @@ static FAR struct ftpd_server_s *ftpd_openserver(int port,
    * by definition and purpose of DHCP, undefined yet).
    */
 
-  if (ifname != NULL)
+  if ((ifname != NULL) && (ifname[0] != 0))
     {
       if (setsockopt(server->sd, SOL_SOCKET, SO_BINDTODEVICE,
                     ifname, strlen(ifname)) < 0)

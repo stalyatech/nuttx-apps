@@ -173,7 +173,7 @@ int ftpd_daemon(int s_argc, char **s_argv)
   int ret = EXIT_FAILURE;
   int option;
   int family = AF_UNSPEC;
-  char ifname[IF_NAMESIZE] = {"eth0"};
+  char ifname[IF_NAMESIZE] = {0};
 
   /* The FTPD daemon has been started */
 
