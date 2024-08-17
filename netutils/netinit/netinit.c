@@ -72,6 +72,8 @@
 #endif
 
 #include "netutils/netinit.h"
+#include "netutils/telnetd.h"
+#include "nshlib/nshlib.h"
 
 #ifdef CONFIG_NETUTILS_NETINIT
 
@@ -629,7 +631,7 @@ static void netinit_set_ipaddrs(FAR const char *ifname)
  ****************************************************************************/
 
 #if defined(NETINIT_HAVE_NETDEV) && !defined(CONFIG_NETINIT_NETLOCAL)
-static void netinit_net_bringup(FAR const char *ifname)
+static int netinit_net_bringup(FAR const char *ifname)
 {
 #ifdef CONFIG_NETUTILS_DHCPC
   uint8_t mac[IFHWADDRLEN];
@@ -641,7 +643,7 @@ static void netinit_net_bringup(FAR const char *ifname)
 
   if (netlib_ifup(ifname) < 0)
     {
-      return;
+      return ERROR;
     }
 
 #if defined(CONFIG_WIRELESS_WAPI) && defined(CONFIG_DRIVERS_IEEE80211)
@@ -649,7 +651,7 @@ static void netinit_net_bringup(FAR const char *ifname)
 
   if (netinit_associate(ifname) < 0)
     {
-      return;
+      return ERROR;
     }
 #endif
 
@@ -671,7 +673,7 @@ static void netinit_net_bringup(FAR const char *ifname)
       handle = dhcpc_open(ifname, &mac, IFHWADDRLEN);
       if (handle == NULL)
         {
-          return;
+          return ERROR;
         }
 
       /* Get an IP address.  Note that there is no logic for renewing the
@@ -708,9 +710,11 @@ static void netinit_net_bringup(FAR const char *ifname)
 
   ntpc_start();
 #endif
+
+  return OK;
 }
 #else
-#  define netinit_net_bringup(ifname)
+#  define netinit_net_bringup(ifname)   (OK)
 #endif
 
 /****************************************************************************
@@ -733,8 +737,8 @@ static void netinit_configure(void)
   /* Set up IP addresses */
 
   netinit_set_ipaddrs("eth0");
-  netinit_set_ipaddrs("wlan0");
   netinit_set_ipaddrs("bnep0");
+  netinit_set_ipaddrs("wlan0");
 
   /* That completes the 'local' initialization of the network device. */
 
@@ -742,8 +746,38 @@ static void netinit_configure(void)
   /* Bring the network up. */
 
   netinit_net_bringup("eth0");
-  netinit_net_bringup("wlan0");
   netinit_net_bringup("bnep0");
+  if (netinit_net_bringup("wlan0") == OK)
+    {
+      FAR char *argv_[] =
+      {
+        CONFIG_SYSTEM_TELNETD_PROGNAME,
+        "-c",
+        NULL,
+      };
+
+      struct telnetd_config_s config =
+      {
+        HTONS(CONFIG_SYSTEM_TELNETD_PORT),
+#ifdef CONFIG_NET_IPv4
+        AF_INET,
+#else
+        AF_INET6,
+#endif
+        CONFIG_SYSTEM_TELNETD_SESSION_PRIORITY,
+        CONFIG_SYSTEM_TELNETD_SESSION_STACKSIZE,
+#ifndef CONFIG_BUILD_KERNEL
+        nsh_telnetmain,
+#endif
+#ifdef CONFIG_LIBC_EXECFUNCS
+        CONFIG_SYSTEM_TELNETD_PROGNAME,
+#endif
+        argv_,
+        NULL,
+      };
+
+      telnetd_daemon(&config);
+    }
 #endif
 #endif /* NETINIT_HAVE_NETDEV */
 }

@@ -62,7 +62,7 @@ int main(int argc, FAR char *argv[])
     CONFIG_SYSTEM_TELNETD_PROGNAME,
 #endif
     argv_,
-    "wlan0",
+    NULL,
   };
 
   int daemon = 1;
