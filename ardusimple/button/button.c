@@ -170,21 +170,22 @@ static int button_daemon(int argc, char *argv[])
 
               if (++counter > BUTTON_POWEROFF_CNT)
                 {
-                  /* Clear the counter */
-
-                  counter = 0;
-
                   /* Play the power off sound */
 
                   system("tone -x");
-
-                  /* Power off the device */
-
-                  system("poweroff");
                 }
             }
           else
             {
+              /* Wait for button release to poweroff */
+
+              if (counter > BUTTON_POWEROFF_CNT)
+                {
+                  /* Power off the device */
+
+                  system("poweroff");
+                }
+
               /* Clear the counter */
 
               counter = 0;
