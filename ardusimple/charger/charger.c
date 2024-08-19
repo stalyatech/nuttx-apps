@@ -60,6 +60,12 @@
 #  define CONFIG_ADC_GROUPSIZE 2
 #endif
 
+#ifdef CONFIG_EXAMPLES_VBUS_DEVNAME
+#  define VBUS_DEVPATH CONFIG_EXAMPLES_VBUS_DEVNAME
+#else
+#  define VBUS_DEVPATH "/dev/gpio1"
+#endif
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -130,15 +136,17 @@ static int show_bat_status(int fd)
 int main(int argc, FAR char *argv[])
 {
   struct adc_msg_s sample[CONFIG_ADC_GROUPSIZE];
+  FAR struct batio_operate_msg_s op;
   int opt, verbose = 0;
+  int ret, errval = 0;
   size_t readsize;
   ssize_t nbytes;
   int current;
   int voltage;
   int fd_conf;
   int fd_meas;
-  int ret, op;
-  int errval = 0;
+  int fd_vbus;
+  char vbus;
 
   while ((opt = getopt(argc, argv, "v")) != -1)
     {
@@ -173,7 +181,7 @@ int main(int argc, FAR char *argv[])
 
   /* Set the input current limit (mA) */
 
-  current = 1000;
+  current = 2000;
   ret = ioctl(fd_conf, BATIOC_INPUT_CURRENT, (unsigned long)(uintptr_t)&current);
   if (ret < 0)
     {
@@ -184,7 +192,7 @@ int main(int argc, FAR char *argv[])
 
   /* Set the charge current (mA) */
 
-  current = 500;
+  current = 1536;
   ret = ioctl(fd_conf, BATIOC_CURRENT, (unsigned long)(uintptr_t)&current);
   if (ret < 0)
     {
@@ -204,25 +212,39 @@ int main(int argc, FAR char *argv[])
       goto errout_conf;
     }
 
-  /* Set charging mode */
+  /* Enable charger termination  */
 
-  op = BATIO_OPRTN_CHARGE;
+  op.operate_type = BATIO_OPRTN_EN_TERM;
+  op.u32 = 1;
   ret = ioctl(fd_conf, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
   if (ret < 0)
     {
       errval = errno;
-      printf("ioctl BATIOC_OPERATE failed. %d\n", errval);
+      printf("ioctl BATIOC_OPERATE(%d) failed. %d\n", op.operate_type, errval);
+      goto errout_conf;
+    }
+
+  /* Set charging mode */
+
+  op.operate_type = BATIO_OPRTN_CHARGE;
+  op.u32 = 0;
+  ret = ioctl(fd_conf, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
+  if (ret < 0)
+    {
+      errval = errno;
+      printf("ioctl BATIOC_OPERATE(%d) failed. %d\n", op.operate_type, errval);
       goto errout_conf;
     }
 
   /* Set system on mode (BATFET enable) */
 
-  op = BATIO_OPRTN_SYSON;
+  op.operate_type = BATIO_OPRTN_SYSON;
+  op.u32 = 0;
   ret = ioctl(fd_conf, BATIOC_OPERATE, (unsigned long)(uintptr_t)&op);
   if (ret < 0)
     {
       errval = errno;
-      printf("ioctl BATIOC_OPERATE failed. %d\n", errval);
+      printf("ioctl BATIOC_OPERATE(%d) failed. %d\n", op.operate_type, errval);
       goto errout_conf;
     }
 
@@ -239,7 +261,7 @@ int main(int argc, FAR char *argv[])
       show_bat_status(fd_conf);
     }
 
-  /* open the adc device */
+  /* open the ADC device */
 
   fd_meas = open(ADC_DEVPATH, O_RDWR);
   if (fd_meas < 0)
@@ -249,7 +271,17 @@ int main(int argc, FAR char *argv[])
       goto errout_conf;
     }
 
-/* Measure the battery voltage forever*/
+  /* open the GPIO device */
+
+  fd_vbus = open(VBUS_DEVPATH, O_RDWR);
+  if (fd_vbus < 0)
+    {
+      errval = errno;
+      printf("GPIO device open error.\n");
+      goto errout_meas;
+    }
+
+/* Measure the battery voltage forever */
 
 while (1)
   {
@@ -274,7 +306,7 @@ while (1)
         if (errval != EINTR)
           {
             errval = 3;
-            goto errout_meas;
+            goto errout_vbus;
           }
       }
 
@@ -289,10 +321,36 @@ while (1)
           }
       }
 
+    /* Read the VBUS status */
+
+    nbytes = read(fd_vbus, &vbus, sizeof(vbus));
+
+    /* Handle unexpected return values */
+
+    if (nbytes < 0)
+      {
+        errval = errno;
+        if (errval != EINTR)
+          {
+            errval = 4;
+            goto errout_vbus;
+          }
+      }
+
+    /* Print the sample data on successful return */
+
+    else if (nbytes > 0)
+      {
+
+      }
+
     /* Wait for a while */
 
     sleep(1);
   }
+
+errout_vbus:
+  close(fd_vbus);
 
 errout_meas:
   close(fd_meas);
